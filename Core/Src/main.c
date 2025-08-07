@@ -1015,7 +1015,7 @@ void updateControlParameters() {
             Kd2 = KdK1;
             rAngle_tar1 = AngleH1 * M_PI * 65 / (12 * 180.0);
             rAngle_tar2 = AngleK1 * M_PI * 65 / (12 * 180.0);
-            if (posF1 < (AngleH1 - tolerance)){
+            if (posF1 < (AngleH1 + tolerance)){
             	heelSwitchLeft = 2;
             }
             break;

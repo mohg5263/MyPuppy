@@ -168,8 +168,8 @@ int motorID2 = 2;
 int motorID3 = 3;
 int motorID4 = 4;
 
-int motorActivated1 = 0;
-int motorActivated2 = 0;
+int motorActivated1 = 1;
+int motorActivated2 = 1;
 int motorActivated3 = 1;
 int motorActivated4 = 1;
 
@@ -1006,85 +1006,85 @@ void updateControlParameters() {
 
 
 
-//    switch (heelSwitchLeft) {
-//        // Swing Extension
-//        case 1:
-//            Kp1 = KpH1;
-//            Kd1 = KdH1;
-//            Kp2 = KpK1;
-//            Kd2 = KdK1;
-//            rAngle_tar1 = AngleH1 * M_PI * 65 / (12 * 180.0);
-//            rAngle_tar2 = AngleK1 * M_PI * 65 / (12 * 180.0);
-//            if (posF1 < (AngleH1 + tolerance)){
-//            	heelSwitchLeft = 2;
-//            }
-//            break;
-//        // Stance
-//        case 2:
-//            Kp1 = KpH2;
-//            Kd1 = KdH2;
-//            Kp2 = KpK2;
-//            Kd2 = KdK2;
-//            rAngle_tar1 = AngleH2 * M_PI * 65 / (12 * 180.0);
-//            rAngle_tar2 = AngleK2 * M_PI * 65 / (12 * 180.0);
-//            if (-3 < speedF1 && speedF1 < 3 && posF1 < (AngleH2 + tolerance)) {
-//                heelSwitchLeft = 3;
-//            }
-//            break;
-//        // Preswing
-//        case 3:
-//            Kp1 = KpH3;
-//            Kd1 = KdH3;
-//            Kp2 = KpK3;
-//            Kd2 = KdK3;
-//            rAngle_tar1 = AngleH3 * M_PI * 65 / (12 * 180.0);
-//            rAngle_tar2 = AngleK3 * M_PI * 65 / (12 * 180.0);
-//            if (posF1 < (AngleH3 + tolerance)) {
-//                heelSwitchLeft = 5;
-//            }
-//            break;
-//        // Delay
-//        case 5:
-//            if (skippedLeft < skipForDelay) {
-//                skippedLeft++;
-//            } else {
-//                heelSwitchLeft = 4;
-//                skippedLeft = 0;
-//            }
-//            break;
-//        // Swing Flexion
-//        case 4:
-//            Kp1 = KpH4;
-//            Kd1 = KdH4;
-//            Kp2 = KpK4;
-//            Kd2 = KdK4;
-//            rAngle_tar1 = AngleH4 * M_PI * 65 / (12 * 180.0);
-//            rAngle_tar2 = AngleK4 * M_PI * 65 / (12 * 180.0);
-//            if (-1 < speedF2 && speedF2 < 1 && posF2 > (AngleK4 - tolerance)) {
-//                heelSwitchLeft = 1;
-//            }
-//            break;
-//    }
-//
-//
-//
-//    // Initiate/Update Ramp for Motor 1 (Left Hip)
-//    // Check if the calculated target is significantly different or if the ramp is not active
-//    if (fabs(ramp[0].target - rAngle_tar1) > ANGLE_CHANGE_THRESHOLD && ramp[0].active == 0) {
-//        ramp[0].start = ramp[0].current; // Start the ramp from the current position
-//        ramp[0].target = rAngle_tar1;
-//        ramp[0].startTime = HAL_GetTick();
-//        ramp[0].active = 1;
-//        ramp[0].duration = RAMP_DURATION;
-//    }
-//    // Initiate/Update Ramp for Motor 2 (Left Knee)
-//    if (fabs(ramp[1].target - rAngle_tar2) > ANGLE_CHANGE_THRESHOLD && ramp[1].active == 0) {
-//        ramp[1].start = ramp[1].current;
-//        ramp[1].target = rAngle_tar2;
-//        ramp[1].startTime = HAL_GetTick();
-//        ramp[1].active = 1;
-//        ramp[1].duration = RAMP_DURATION;
-//    }
+    switch (heelSwitchLeft) {
+        // Swing Extension
+        case 1:
+            Kp1 = KpH1;
+            Kd1 = KdH1;
+            Kp2 = KpK1;
+            Kd2 = KdK1;
+            rAngle_tar1 = AngleH1 * M_PI * 65 / (12 * 180.0);
+            rAngle_tar2 = AngleK1 * M_PI * 65 / (12 * 180.0);
+            if (posF1 < (AngleH1 + tolerance)){
+            	heelSwitchLeft = 2;
+            }
+            break;
+        // Stance
+        case 2:
+            Kp1 = KpH2;
+            Kd1 = KdH2;
+            Kp2 = KpK2;
+            Kd2 = KdK2;
+            rAngle_tar1 = AngleH2 * M_PI * 65 / (12 * 180.0);
+            rAngle_tar2 = AngleK2 * M_PI * 65 / (12 * 180.0);
+            if (-3 < speedF1 && speedF1 < 3 && posF1 < (AngleH2 + tolerance)) {
+                heelSwitchLeft = 3;
+            }
+            break;
+        // Preswing
+        case 3:
+            Kp1 = KpH3;
+            Kd1 = KdH3;
+            Kp2 = KpK3;
+            Kd2 = KdK3;
+            rAngle_tar1 = AngleH3 * M_PI * 65 / (12 * 180.0);
+            rAngle_tar2 = AngleK3 * M_PI * 65 / (12 * 180.0);
+            if (posF1 < (AngleH3 + tolerance)) {
+                heelSwitchLeft = 5;
+            }
+            break;
+        // Delay
+        case 5:
+            if (skippedLeft < skipForDelay) {
+                skippedLeft++;
+            } else {
+                heelSwitchLeft = 4;
+                skippedLeft = 0;
+            }
+            break;
+        // Swing Flexion
+        case 4:
+            Kp1 = KpH4;
+            Kd1 = KdH4;
+            Kp2 = KpK4;
+            Kd2 = KdK4;
+            rAngle_tar1 = AngleH4 * M_PI * 65 / (12 * 180.0);
+            rAngle_tar2 = AngleK4 * M_PI * 65 / (12 * 180.0);
+            if (-1 < speedF2 && speedF2 < 1 && posF2 > (AngleK4 - tolerance)) {
+                heelSwitchLeft = 1;
+            }
+            break;
+    }
+
+
+
+    // Initiate/Update Ramp for Motor 1 (Left Hip)
+    // Check if the calculated target is significantly different or if the ramp is not active
+    if (fabs(ramp[0].target - rAngle_tar1) > ANGLE_CHANGE_THRESHOLD && ramp[0].active == 0) {
+        ramp[0].start = ramp[0].current; // Start the ramp from the current position
+        ramp[0].target = rAngle_tar1;
+        ramp[0].startTime = HAL_GetTick();
+        ramp[0].active = 1;
+        ramp[0].duration = RAMP_DURATION;
+    }
+    // Initiate/Update Ramp for Motor 2 (Left Knee)
+    if (fabs(ramp[1].target - rAngle_tar2) > ANGLE_CHANGE_THRESHOLD && ramp[1].active == 0) {
+        ramp[1].start = ramp[1].current;
+        ramp[1].target = rAngle_tar2;
+        ramp[1].startTime = HAL_GetTick();
+        ramp[1].active = 1;
+        ramp[1].duration = RAMP_DURATION;
+    }
 
 
 

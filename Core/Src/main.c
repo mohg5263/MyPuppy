@@ -940,9 +940,9 @@ double KdH3=0.3;
 double KpK3=1;
 double KdK3=0.3;
 //4     Swing Flexion
-double KpH4=1;
+double KpH4=1.0;
 double KdH4=0.3;
-double KpK4=1.0;
+double KpK4=2.0;
 double KdK4=0.3;
 
 int skipForDelay=40;
@@ -1101,7 +1101,7 @@ void updateControlParameters() {
                 Kd4 = KdK1;
                 rAngle_tar3 = AngleH1 * M_PI * 65 / (12 * 180.0);
                 rAngle_tar4 = AngleK1 * M_PI * 65 / (12 * 180.0);
-                if (posF2 < (AngleH1 + tolerance)){
+                if (posF3 < (AngleH1 + tolerance)){
                 	heelSwitchRight = 2;
                 }
                 break;

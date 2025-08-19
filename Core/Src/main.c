@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <math.h>
+#include <stdbool.h>
 
 
 /* USER CODE END Includes */
@@ -156,6 +157,10 @@ float rAngle2=0;
 float rAngle3=0;
 float rAngle4=0;
 
+float height=0;
+float X1=0;
+float Y1=0;
+
 //********************************************************************************
 
 
@@ -279,9 +284,6 @@ float uint_to_float(int x_int, float x_min, float x_max, int bits) {
 
 
 
-
-
-
 /* USER CODE END 0 */
 
 /**
@@ -366,19 +368,7 @@ int main(void)
 
 
 
-	// MODIFIED: Initialize the ramps
-	for (int i = 0; i < 4; i++) {
-	    ramp[i].active = 0;     // Not active initially
-	    ramp[i].current = 0.0f; // Start at 0 radians (or your initial desired position)
-	    ramp[i].target = 0.0f;  // Target also 0 initially
-	    ramp[i].start = 0.0f;   // Start of ramp also 0
-	    ramp[i].startTime = 0;  // No start time yet
-	    ramp[i].duration = RAMP_DURATION; // Use the defined constant
-	}
 
-
-
-//	cycle = 0;
 
   /* USER CODE END 2 */
 
@@ -398,10 +388,6 @@ int main(void)
 	  }
 
 
-//	  if (update_button) {
-//		  updateButtons();
-//		  update_button = 0;
-//	  }
   }
   /* USER CODE END 3 */
 }
@@ -654,9 +640,6 @@ void CAN1_Tx_motor_on(int motor_id) {
 		Error_Handler();
 	}
 
-//	// Polling method, Wait for message to get out of pending state, that means wait until the message is transmitted successfully.
-//	while (HAL_CAN_IsTxMessagePending(&hcan1, TxMailbox))
-//		;
 
 }
 
@@ -690,9 +673,6 @@ void CAN1_Tx_motor_zero(int motor_id) {
 		Error_Handler();
 	}
 
-//	// Polling method, Wait for message to get out of pending state, that means wait until the message is transmitted successfully.
-//	while (HAL_CAN_IsTxMessagePending(&hcan1, TxMailbox))
-//		;
 }
 
 void CAN1_Tx_motor_off(int motor_id) {
@@ -854,13 +834,13 @@ void signalMotors(float rAngle1, float rAngle2, float rAngle3, float rAngle4){
 
 	// Command motor 1 and read current CAN message
 	if (motorActivated1) {
-		CAN1_Tx_send_to_motor(motorID1, -rAngle1, 0, Kp1, Kd1, 0); //position mode
+		CAN1_Tx_send_to_motor(motorID1, rAngle1, 0, Kp1, Kd1, 0); //position mode
 	} else {
 		CAN1_Tx_send_to_motor(motorID1, 0, 0, 0, 0, 0);
 	}
 
 	CAN1_Rx_message_read();
-	posF1 = -position_1    * 180.0 / M_PI / 65 * 12;
+	posF1 = position_1    * 180.0 / M_PI / 65 * 12;
 	speedF1 = velocity_1;
 	torqueF1 = torque_1;
 
@@ -931,13 +911,94 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 
 
+// Result struct (like MATLAB multiple outputs)
+typedef struct {
+    bool reachable;
+    float theta1_down;
+    float theta2_down;
+    float theta1_up;
+    float theta2_up;
+} IKResult;
 
+// IK function
+IKResult IK(float x, float y)
+{
+    const float l1 = 12.29*0.0254;
+    const float l2 = 13.89*0.0254;
 
+    // Joint limits in radians
+    const float theta1_min = -60 * M_PI/180; // -60 deg
+    const float theta1_max =  60 * M_PI/180; //  60 deg
+    const float theta2_min = -130 * M_PI/180;; // -130 deg
+    const float theta2_max =  50 * M_PI/180;; //  40 deg
+
+    IKResult result;
+
+    float r2 = x*x + y*y;
+
+    // Check reachability in workspace
+    if (r2 < (l1 - l2)*(l1 - l2) || r2 > (l1 + l2)*(l1 + l2)) {
+        result.reachable = false;
+        return result;
+    }
+
+    // Compute cos(theta2)
+    float cos_theta2 = (r2 - l1*l1 - l2*l2) / (2.0f * l1 * l2);
+    if (cos_theta2 > 1.0f) cos_theta2 = 1.0f;
+    if (cos_theta2 < -1.0f) cos_theta2 = -1.0f;
+
+    float theta2_down = acosf(cos_theta2);
+    float theta2_up   = -acosf(cos_theta2);
+
+    float solve_theta1(float theta2) {
+        float phi = atan2f(x, -y);  // matches MATLAB fix
+        float k1 = l1 + l2 * cosf(theta2);
+        float k2 = l2 * sinf(theta2);
+        float psi = atan2f(k2, k1);
+        return phi - psi;
+    }
+
+    float theta1_down = solve_theta1(theta2_down);
+    float theta1_up   = solve_theta1(theta2_up);
+
+    // Clamp to joint limits
+    if (theta1_down < theta1_min) theta1_down = theta1_min;
+    if (theta1_down > theta1_max) theta1_down = theta1_max;
+    if (theta1_up < theta1_min) theta1_up = theta1_min;
+    if (theta1_up > theta1_max) theta1_up = theta1_max;
+
+    if (theta2_down < theta2_min) theta2_down = theta2_min;
+    if (theta2_down > theta2_max) theta2_down = theta2_max;
+    if (theta2_up < theta2_min) theta2_up = theta2_min;
+    if (theta2_up > theta2_max) theta2_up = theta2_max;
+
+    result.theta1_down = theta1_down;
+    result.theta2_down = theta2_down;
+    result.theta1_up   = theta1_up;
+    result.theta2_up   = theta2_up;
+    result.reachable   = true;
+
+    return result;
+}
 
 
 
 void updateControlParameters() {
 	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
+
+    // Test point
+    X1 = 0;
+    Y1 = -0.6649+height;
+
+    IKResult sol = IK(X1, Y1);
+
+    AngleH1=sol.theta1_up * 180.0f / M_PI;
+    AngleK1=sol.theta2_up * 180.0f / M_PI;
+
+    Kp1=0.5;
+    Kd1=0.1;
+    Kp2=0.5;
+    Kd2=0.1;
 
 
 
@@ -956,21 +1017,7 @@ void updateControlParameters() {
 }
 
 
-// NEW: Ramping function
-void updateRamp(int motorIdx) {
-    if (ramp[motorIdx].active) {
-        uint32_t elapsedTime = HAL_GetTick() - ramp[motorIdx].startTime;
-        float progress = (float)elapsedTime / (float)ramp[motorIdx].duration;
 
-        if (progress >= 1.0f) {
-            progress = 1.0f;
-            ramp[motorIdx].active = 0; // Ramp finished
-        }
-
-        // Linear interpolation: current = start + (target - start) * progress
-        ramp[motorIdx].current = ramp[motorIdx].start + (ramp[motorIdx].target - ramp[motorIdx].start) * progress;
-    }
-}
 
 
 

@@ -157,9 +157,13 @@ float rAngle2=0;
 float rAngle3=0;
 float rAngle4=0;
 
-float height=0;
+float height1=0;
 float X1=0;
 float Y1=0;
+
+float height2=0;
+float X2=0;
+float Y2=0;
 
 //********************************************************************************
 
@@ -175,8 +179,8 @@ int motorID4 = 4;
 
 int motorActivated1 = 1;
 int motorActivated2 = 1;
-int motorActivated3 = 0;
-int motorActivated4 = 0;
+int motorActivated3 = 1;
+int motorActivated4 = 1;
 
 double Kp1=0;
 double Kd1=0;
@@ -758,8 +762,6 @@ void CAN1_Tx_send_to_motor(int motor_id, float pos, float vel, float kp,
 		Error_Handler();
 	}
 
-//	// Polling method, Wait for message to get out of pending state, that means wait until the message is transmitted successfully.
-//	while (HAL_CAN_IsTxMessagePending(&hcan1, TxMailbox));
 
 }
 
@@ -870,13 +872,13 @@ void signalMotors(float rAngle1, float rAngle2, float rAngle3, float rAngle4){
 
 	// Command motor 1 and read current CAN message
 	if (motorActivated4) {
-		CAN1_Tx_send_to_motor(motorID4, rAngle4, 0, Kp4, Kd4, 0); //position mode
+		CAN1_Tx_send_to_motor(motorID4, -rAngle4, 0, Kp4, Kd4, 0); //position mode
 	} else {
 		CAN1_Tx_send_to_motor(motorID4, 0, 0, 0, 0, 0);
 	}
 
 	CAN1_Rx_message_read();
-	posF4 = position_4 * 180.0 / M_PI / 65 * 12;
+	posF4 = -position_4 * 180.0 / M_PI / 65 * 12;
 	speedF4 = velocity_4;
 	torqueF4 = torque_4;
 
@@ -921,7 +923,7 @@ typedef struct {
 } IKResult;
 
 // IK function
-IKResult IK(float x, float y)
+IKResult IK(float x, float y, float theta2_min, float theta2_max)
 {
     const float l1 = 12.29*0.0254;
     const float l2 = 13.89*0.0254;
@@ -929,8 +931,8 @@ IKResult IK(float x, float y)
     // Joint limits in radians
     const float theta1_min = -60 * M_PI/180; // -60 deg
     const float theta1_max =  60 * M_PI/180; //  60 deg
-    const float theta2_min = -130 * M_PI/180;; // -130 deg
-    const float theta2_max =  50 * M_PI/180;; //  40 deg
+    theta2_min = theta2_min * M_PI/180;; // -130 deg
+    theta2_max =  theta2_max * M_PI/180;; //  50 deg
 
     IKResult result;
 
@@ -988,17 +990,32 @@ void updateControlParameters() {
 
     // Test point
     X1 = 0;
-    Y1 = -0.6649+height;
+    Y1 = -0.6649+height1;
 
-    IKResult sol = IK(X1, Y1);
+    IKResult sol1 = IK(X1, Y1, -130,50);
 
-    AngleH1=sol.theta1_up * 180.0f / M_PI;
-    AngleK1=sol.theta2_up * 180.0f / M_PI;
+    AngleH1=sol1.theta1_up * 180.0f / M_PI;
+    AngleK1=sol1.theta2_up * 180.0f / M_PI;
 
     Kp1=0.5;
     Kd1=0.1;
     Kp2=0.5;
     Kd2=0.1;
+
+
+    // Test point
+    X2 = 0;
+    Y2 = -0.6649+height2;
+
+    IKResult sol2 = IK(X2, Y2, -50, 130);
+
+    AngleH2=sol2.theta1_down * 180.0f / M_PI;
+    AngleK2=sol2.theta2_down * 180.0f / M_PI;
+
+    Kp3=0.5;
+    Kd3=0.1;
+    Kp4=0.5;
+    Kd4=0.1;
 
 
 

@@ -88,7 +88,7 @@ void CAN1_Tx_motor_off(int);
 void CAN1_Rx_message_read(void);
 float interpolateHipAngle(float);
 float interpolateKneeAngle(float);
-void Stop_Motors(int, int, int, int, int, int);
+void Stop_Motors(int, int, int, int, int, int, int, int);
 
 
 /* Function Prototypes */
@@ -145,6 +145,16 @@ float position_6 = 0;
 float velocity_6 = 0;
 float torque_6 = 0;
 float temp_6 = 0;
+//for motor 7
+float position_7 = 0;
+float velocity_7 = 0;
+float torque_7 = 0;
+float temp_7 = 0;
+//for motor 8
+float position_8 = 0;
+float velocity_8 = 0;
+float torque_8 = 0;
+float temp_8 = 0;
 
 float wPos1 = 0;
 float wPos2 = 0;
@@ -152,6 +162,8 @@ float wPos3 = 0;
 float wPos4 = 0;
 float wPos5 = 0;
 float wPos6 = 0;
+float wPos7 = 0;
+float wPos8 = 0;
 
 float posF1 = 0;
 float posF2 = 0;
@@ -159,6 +171,8 @@ float posF3 = 0;
 float posF4 = 0;
 float posF5 = 0;
 float posF6 = 0;
+float posF7 = 0;
+float posF8 = 0;
 
 
 float rAngle1=0;
@@ -167,6 +181,8 @@ float rAngle3=0;
 float rAngle4=0;
 float rAngle5=0;
 float rAngle6=0;
+float rAngle7=0;
+float rAngle8=0;
 
 float height1=0;
 float X1=0;
@@ -179,6 +195,10 @@ float Y2=0;
 float height3=0;
 float X3=0;
 float Y3=0;
+
+float height4=0;
+float X4=0;
+float Y4=0;
 
 //********************************************************************************
 
@@ -193,6 +213,8 @@ int motorID3 = 3;
 int motorID4 = 4;
 int motorID5 = 5;
 int motorID6 = 6;
+int motorID7 = 7;
+int motorID8 = 8;
 
 int motorActivated1 = 1;
 int motorActivated2 = 1;
@@ -200,6 +222,8 @@ int motorActivated3 = 1;
 int motorActivated4 = 1;
 int motorActivated5 = 1;
 int motorActivated6 = 1;
+int motorActivated7 = 1;
+int motorActivated8 = 1;
 
 double Kp1=0;
 double Kd1=0;
@@ -218,6 +242,12 @@ double Kd5=0;
 
 double Kp6=0;
 double Kd6=0;
+
+double Kp7=0;
+double Kd7=0;
+
+double Kp8=0;
+double Kd8=0;
 
 double samplingTime = 2.5;	//ms
 
@@ -268,6 +298,22 @@ float torqueF6 = 0;
 float speedF6 = 0;
 float lastPos6;
 float torqSignal6 = 0;
+
+double error7, lastError7 = 0;
+double integral7 = 0;
+double derivative7;
+float torqueF7 = 0;
+float speedF7 = 0;
+float lastPos7;
+float torqSignal7 = 0;
+
+double error8, lastError8 = 0;
+double integral8 = 0;
+double derivative8;
+float torqueF8 = 0;
+float speedF8 = 0;
+float lastPos8;
+float torqSignal8 = 0;
 
 float startTime = 0;
 float currentTime = 0;
@@ -418,6 +464,21 @@ int main(void)
 	CAN1_Tx_motor_zero(motorID6);
 	CAN1_Rx_message_read();
 	sprintf(msg, "Motor 6 Initialized!\r\n");
+	HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
+
+
+	CAN1_Tx_motor_on(motorID7);
+	CAN1_Rx_message_read();
+	CAN1_Tx_motor_zero(motorID7);
+	CAN1_Rx_message_read();
+	sprintf(msg, "Motor 7 Initialized!\r\n");
+	HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
+
+	CAN1_Tx_motor_on(motorID8);
+	CAN1_Rx_message_read();
+	CAN1_Tx_motor_zero(motorID8);
+	CAN1_Rx_message_read();
+	sprintf(msg, "Motor 8 Initialized!\r\n");
 	HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
 
 
@@ -900,12 +961,28 @@ void CAN1_Rx_message_read(void) {
 		temp_6 = T - 40; // Temperature range: -40~215
 	}
 
+	if (id == motorID7)	//if motor 1 data is received
+			{
+		position_7 = p; // Read corresponding data based on ID
+		velocity_7 = v;
+		torque_7 = i;
+		temp_7 = T - 40; // Temperature range: -40~215
+	}
+
+	if (id == motorID8)	//if motor 1 data is received
+			{
+		position_8 = p; // Read corresponding data based on ID
+		velocity_8 = v;
+		torque_8 = i;
+		temp_8 = T - 40; // Temperature range: -40~215
+	}
+
 }
 
 
 
 
-void signalMotors(float rAngle1, float rAngle2, float rAngle3, float rAngle4, float rAngle5, float rAngle6){
+void signalMotors(float rAngle1, float rAngle2, float rAngle3, float rAngle4, float rAngle5, float rAngle6, float rAngle7, float rAngle8){
 
 	// Command motor 1 and read current CAN message
 	if (motorActivated1) {
@@ -982,6 +1059,31 @@ void signalMotors(float rAngle1, float rAngle2, float rAngle3, float rAngle4, fl
 	torqueF6 = torque_6;
 
 
+	// Command motor 7 and read current CAN message
+	if (motorActivated7) {
+		CAN1_Tx_send_to_motor(motorID7, rAngle7, 0, Kp7, Kd7, 0); //position mode
+	} else {
+		CAN1_Tx_send_to_motor(motorID7, 0, 0, 0, 0, 0);
+	}
+
+	CAN1_Rx_message_read();
+	posF7 = position_7 * 180.0 / M_PI / 65 * 12;
+	speedF7 = velocity_7;
+	torqueF7 = torque_7;
+
+	// Command motor 8 and read current CAN message
+	if (motorActivated8) {
+		CAN1_Tx_send_to_motor(motorID8, -rAngle8, 0, Kp8, Kd8, 0); //position mode
+	} else {
+		CAN1_Tx_send_to_motor(motorID8, 0, 0, 0, 0, 0);
+	}
+
+	CAN1_Rx_message_read();
+	posF8 = -position_8 * 180.0 / M_PI / 65 * 12;
+	speedF8 = velocity_8;
+	torqueF8 = torque_8;
+
+
 
 
 
@@ -998,6 +1100,8 @@ double AngleH2 = 0;
 double AngleK2 = 0;
 double AngleH3 = 0;
 double AngleK3 = 0;
+double AngleH4 = 0;
+double AngleK4 = 0;
 
 
 
@@ -1023,8 +1127,8 @@ typedef struct {
 // IK function
 IKResult IK(float x, float y, float theta2_min, float theta2_max)
 {
-    const float l1 = 12.29*0.0254;
-    const float l2 = 13.89*0.0254;
+    const float l1 = 14.17*0.0254;
+    const float l2 = 9.25*0.0254;
 
     // Joint limits in radians
     const float theta1_min = -60 * M_PI/180; // -60 deg
@@ -1088,46 +1192,60 @@ void updateControlParameters() {
 
     // **Limb 1 Control
     X1 = 0;
-    Y1 = -0.6649+height1;
+    Y1 = -0.595+height1;
 
     IKResult sol1 = IK(X1, Y1, -130,50);
 
     AngleH1=sol1.theta1_up * 180.0f / M_PI;
     AngleK1=sol1.theta2_up * 180.0f / M_PI;
 
-    Kp1=0.5;
-    Kd1=0.1;
-    Kp2=0.5;
-    Kd2=0.1;
+    Kp1=1;
+    Kd1=0.2;
+    Kp2=1;
+    Kd2=0.2;
 
 
     // **Limb 2 Control
     X2 = 0;
-    Y2 = -0.6649+height2;
+    Y2 = -0.595+height2;
 
     IKResult sol2 = IK(X2, Y2, -50, 130);
 
     AngleH2=sol2.theta1_down * 180.0f / M_PI;
     AngleK2=sol2.theta2_down * 180.0f / M_PI;
 
-    Kp3=0.5;
-    Kd3=0.1;
-    Kp4=0.5;
-    Kd4=0.1;
+    Kp3=1;
+    Kd3=0.2;
+    Kp4=1;
+    Kd4=0.2;
 
     // **Limb 3 Control
     X3 = 0;
-    Y3 = -0.6649+height2;
+    Y3 = -0.595+height3;
 
     IKResult sol3 = IK(X3, Y3, -50, 130);
 
     AngleH3=sol3.theta1_down * 180.0f / M_PI;
     AngleK3=sol3.theta2_down * 180.0f / M_PI;
 
-    Kp5=0.5;
-    Kd5=0.1;
-    Kp6=0.5;
-    Kd6=0.1;
+    Kp5=1;
+    Kd5=0.2;
+    Kp6=1;
+    Kd6=0.2;
+
+    // **Limb 4 Control
+    X4 = 0;
+    Y4 = -0.595+height4;
+
+    IKResult sol4 = IK(X4, Y4, -130, 50);
+
+    AngleH4=sol4.theta1_up * 180.0f / M_PI;
+    AngleK4=sol4.theta2_up * 180.0f / M_PI;
+
+    Kp7=1;
+    Kd7=0.2;
+    Kp8=1;
+    Kd8=0.2;
 
 
 
@@ -1137,10 +1255,12 @@ void updateControlParameters() {
 	rAngle4 = AngleK2 * M_PI * 65 / (12 * 180.0);
 	rAngle5 = AngleH3 * M_PI * 65 / (12 * 180.0);
 	rAngle6 = AngleK3 * M_PI * 65 / (12 * 180.0);
+	rAngle7 = AngleH4 * M_PI * 65 / (12 * 180.0);
+	rAngle8 = AngleK4 * M_PI * 65 / (12 * 180.0);
 
 
 
-    signalMotors(rAngle1, rAngle2, rAngle3, rAngle4, rAngle5, rAngle6);
+    signalMotors(rAngle1, rAngle2, rAngle3, rAngle4, rAngle5, rAngle6, rAngle7, rAngle8);
 
 
 
@@ -1152,7 +1272,7 @@ void updateControlParameters() {
 
 
 
-void Stop_Motors(int motor1, int motor2, int motor3, int motor4, int motor5, int motor6) {
+void Stop_Motors(int motor1, int motor2, int motor3, int motor4, int motor5, int motor6, int motor7, int motor8) {
 
 	if (motor1) {
 		motorActivated1 = 0;
@@ -1172,6 +1292,12 @@ void Stop_Motors(int motor1, int motor2, int motor3, int motor4, int motor5, int
 	if (motor6) {
 		motorActivated6 = 0;
 	}
+	if (motor7) {
+		motorActivated7 = 0;
+	}
+	if (motor8) {
+		motorActivated8 = 0;
+	}
 }
 
 /* USER CODE END 4 */
@@ -1187,7 +1313,7 @@ void Error_Handler(void)
 	char msg[50];
 	sprintf(msg, "Error Handler Trigerred!\r\n");
 	HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
-	Stop_Motors(1, 1, 1, 1, 1, 1);
+	Stop_Motors(1, 1, 1, 1, 1, 1, 1, 1);
 
   /* USER CODE END Error_Handler_Debug */
 }

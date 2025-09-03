@@ -754,9 +754,6 @@ void CAN1_Tx_motor_on(int motor_id) {
 	while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan1) == 0) {
 		// No available mailbox, wait and retry
 		HAL_Delay(1); // Short delay to prevent a tight loop
-		char msg[50];
-		sprintf(msg, "Transmission needed wait!\r\n");
-		HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
 	}
 
 	//message is transmitted through CAN
@@ -887,96 +884,85 @@ void CAN1_Tx_send_to_motor(int motor_id, float pos, float vel, float kp,
 
 void CAN1_Rx_message_read(void) {
 
-//	char msg[50];	//for showing over the UART
 
-	//we are waiting for at least one message into the RX FIFO0. When that happens, the following code will get out of the loop.
-	//In RX FIFO, you can store 03 CAN messages.
-	uint32_t startTick = HAL_GetTick();
-	while (!HAL_CAN_GetRxFifoFillLevel(&hcan1, CAN_RX_FIFO0))
-	{
-	    if (HAL_GetTick() - startTick > 10)  // 100 ms timeout
-	    {
-	        // handle timeout
-	        return;
-	    }
-	}
+	if (HAL_CAN_GetRxFifoFillLevel(&hcan1, CAN_RX_FIFO0)>0){
+		if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK){
 
-	//Polling based reception of message
-	if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK) //we have to specify the FIFO number
-			{
-		Error_Handler();
-	}
+			//Unpacking the received parameter integers from the RxData
+			int id = RxData[0]; //motor ID
+			int p_int = (RxData[1] << 8) | RxData[2];	//Motor position data
+			int v_int = (RxData[3] << 4) | (RxData[4] >> 4);	//Motor velocity data
+			int i_int = ((RxData[4] & 0xF) << 8) | RxData[5];	//Motor torque data
+			int T_int = RxData[6];	//temperature data
+			/// convert int to float
+			float p = uint_to_float(p_int, P_MIN, P_MAX, 16);
+			float v = uint_to_float(v_int, V_MIN, V_MAX, 12);
+			float i = uint_to_float(i_int, T_MIN, T_MAX, 12);
+			float T = T_int;
+			if (id == motorID1)	//if motor 1 data is received
+					{
+				position_1 = p; // Read corresponding data based on ID
+				velocity_1 = v;
+				torque_1 = i;
+				temp_1 = T - 40; // Temperature range: -40~215
+			}
+			if (id == motorID2)	//if motor 1 data is received
+					{
+				position_2 = p; // Read corresponding data based on ID
+				velocity_2 = v;
+				torque_2 = i;
+				temp_2 = T - 40; // Temperature range: -40~215
+			}
+			if (id == motorID3)	//if motor 1 data is received
+					{
+				position_3 = p; // Read corresponding data based on ID
+				velocity_3 = v;
+				torque_3 = i;
+				temp_3 = T - 40; // Temperature range: -40~215
+			}
+			if (id == motorID4)	//if motor 1 data is received
+					{
+				position_4 = p; // Read corresponding data based on ID
+				velocity_4 = v;
+				torque_4 = i;
+				temp_4 = T - 40; // Temperature range: -40~215
+			}
+			if (id == motorID5)	//if motor 1 data is received
+					{
+				position_5 = p; // Read corresponding data based on ID
+				velocity_5 = v;
+				torque_5 = i;
+				temp_5 = T - 40; // Temperature range: -40~215
+			}
+			if (id == motorID6)	//if motor 1 data is received
+					{
+				position_6 = p; // Read corresponding data based on ID
+				velocity_6 = v;
+				torque_6 = i;
+				temp_6 = T - 40; // Temperature range: -40~215
+			}
 
-	//Unpacking the received parameter integers from the RxData
-	int id = RxData[0]; //motor ID
-	int p_int = (RxData[1] << 8) | RxData[2];	//Motor position data
-	int v_int = (RxData[3] << 4) | (RxData[4] >> 4);	//Motor velocity data
-	int i_int = ((RxData[4] & 0xF) << 8) | RxData[5];	//Motor torque data
-	int T_int = RxData[6];	//temperature data
-	/// convert int to float
-	float p = uint_to_float(p_int, P_MIN, P_MAX, 16);
-	float v = uint_to_float(v_int, V_MIN, V_MAX, 12);
-	float i = uint_to_float(i_int, T_MIN, T_MAX, 12);
-	float T = T_int;
-	if (id == motorID1)	//if motor 1 data is received
-			{
-		position_1 = p; // Read corresponding data based on ID
-		velocity_1 = v;
-		torque_1 = i;
-		temp_1 = T - 40; // Temperature range: -40~215
-	}
-	if (id == motorID2)	//if motor 1 data is received
-			{
-		position_2 = p; // Read corresponding data based on ID
-		velocity_2 = v;
-		torque_2 = i;
-		temp_2 = T - 40; // Temperature range: -40~215
-	}
-	if (id == motorID3)	//if motor 1 data is received
-			{
-		position_3 = p; // Read corresponding data based on ID
-		velocity_3 = v;
-		torque_3 = i;
-		temp_3 = T - 40; // Temperature range: -40~215
-	}
-	if (id == motorID4)	//if motor 1 data is received
-			{
-		position_4 = p; // Read corresponding data based on ID
-		velocity_4 = v;
-		torque_4 = i;
-		temp_4 = T - 40; // Temperature range: -40~215
-	}
-	if (id == motorID5)	//if motor 1 data is received
-			{
-		position_5 = p; // Read corresponding data based on ID
-		velocity_5 = v;
-		torque_5 = i;
-		temp_5 = T - 40; // Temperature range: -40~215
-	}
-	if (id == motorID6)	//if motor 1 data is received
-			{
-		position_6 = p; // Read corresponding data based on ID
-		velocity_6 = v;
-		torque_6 = i;
-		temp_6 = T - 40; // Temperature range: -40~215
-	}
+			if (id == motorID7)	//if motor 1 data is received
+					{
+				position_7 = p; // Read corresponding data based on ID
+				velocity_7 = v;
+				torque_7 = i;
+				temp_7 = T - 40; // Temperature range: -40~215
+			}
 
-	if (id == motorID7)	//if motor 1 data is received
-			{
-		position_7 = p; // Read corresponding data based on ID
-		velocity_7 = v;
-		torque_7 = i;
-		temp_7 = T - 40; // Temperature range: -40~215
-	}
+			if (id == motorID8)	//if motor 1 data is received
+					{
+				position_8 = p; // Read corresponding data based on ID
+				velocity_8 = v;
+				torque_8 = i;
+				temp_8 = T - 40; // Temperature range: -40~215
+			}
 
-	if (id == motorID8)	//if motor 1 data is received
-			{
-		position_8 = p; // Read corresponding data based on ID
-		velocity_8 = v;
-		torque_8 = i;
-		temp_8 = T - 40; // Temperature range: -40~215
-	}
+		}else{
+			 Error_Handler();
+		}
 
+	}
 }
 
 
@@ -984,109 +970,75 @@ void CAN1_Rx_message_read(void) {
 
 void signalMotors(float rAngle1, float rAngle2, float rAngle3, float rAngle4, float rAngle5, float rAngle6, float rAngle7, float rAngle8){
 
-	// Command motor 1 and read current CAN message
-	if (motorActivated1) {
-		CAN1_Tx_send_to_motor(motorID1, rAngle1, 0, Kp1, Kd1, 0); //position mode
-	} else {
-		CAN1_Tx_send_to_motor(motorID1, 0, 0, 0, 0, 0);
-	}
+	// PHASE 1: Send all messages without waiting for responses
+	    if (motorActivated1) CAN1_Tx_send_to_motor(motorID1, rAngle1, 0, Kp1, Kd1, 0);
+	    else CAN1_Tx_send_to_motor(motorID1, 0, 0, 0, 0, 0);
 
-	CAN1_Rx_message_read();
-	posF1 = position_1    * 180.0 / M_PI / 65 * 12;
-	speedF1 = velocity_1;
-	torqueF1 = torque_1;
+	    if (motorActivated2) CAN1_Tx_send_to_motor(motorID2, -rAngle2, 0, Kp2, Kd2, 0);
+	    else CAN1_Tx_send_to_motor(motorID2, 0, 0, 0, 0, 0);
 
-	// Command motor 2 and read current CAN message
-	if (motorActivated2) {
-		CAN1_Tx_send_to_motor(motorID2, -rAngle2, 0, Kp2, Kd2, 0); //position mode
-	} else {
-		CAN1_Tx_send_to_motor(motorID2, 0, 0, 0, 0, 0);
-	}
+	    if (motorActivated3) CAN1_Tx_send_to_motor(motorID3, rAngle3, 0, Kp3, Kd3, 0);
+	    else CAN1_Tx_send_to_motor(motorID3, 0, 0, 0, 0, 0);
 
-	CAN1_Rx_message_read();
-	posF2 = -position_2    * 180.0 / M_PI / 65 * 12;
-	speedF2 = velocity_2;
-	torqueF2 = torque_2;
+	    if (motorActivated4) CAN1_Tx_send_to_motor(motorID4, -rAngle4, 0, Kp4, Kd4, 0);
+	    else CAN1_Tx_send_to_motor(motorID4, 0, 0, 0, 0, 0);
 
-	// Command motor 3 and read current CAN message
-	if (motorActivated3) {
-		CAN1_Tx_send_to_motor(motorID3, rAngle3, 0, Kp3, Kd3, 0); //position mode
-	} else {
-		CAN1_Tx_send_to_motor(motorID3, 0, 0, 0, 0, 0);
-	}
+	    if (motorActivated5) CAN1_Tx_send_to_motor(motorID5, rAngle5, 0, Kp5, Kd5, 0);
+	    else CAN1_Tx_send_to_motor(motorID5, 0, 0, 0, 0, 0);
 
-	CAN1_Rx_message_read();
-	posF3 = position_3  * 180.0 / M_PI / 65 * 12;
-	speedF3 = velocity_3;
-	torqueF3 = torque_3;
+	    if (motorActivated6) CAN1_Tx_send_to_motor(motorID6, -rAngle6, 0, Kp6, Kd6, 0);
+	    else CAN1_Tx_send_to_motor(motorID6, 0, 0, 0, 0, 0);
 
-	// Command motor 4 and read current CAN message
-	if (motorActivated4) {
-		CAN1_Tx_send_to_motor(motorID4, -rAngle4, 0, Kp4, Kd4, 0); //position mode
-	} else {
-		CAN1_Tx_send_to_motor(motorID4, 0, 0, 0, 0, 0);
-	}
+	    if (motorActivated7) CAN1_Tx_send_to_motor(motorID7, rAngle7, 0, Kp7, Kd7, 0);
+	    else CAN1_Tx_send_to_motor(motorID7, 0, 0, 0, 0, 0);
 
-	CAN1_Rx_message_read();
-	posF4 = -position_4 * 180.0 / M_PI / 65 * 12;
-	speedF4 = velocity_4;
-	torqueF4 = torque_4;
-
-
-	// Command motor 5 and read current CAN message
-	if (motorActivated5) {
-		CAN1_Tx_send_to_motor(motorID5, rAngle5, 0, Kp5, Kd5, 0); //position mode
-	} else {
-		CAN1_Tx_send_to_motor(motorID5, 0, 0, 0, 0, 0);
-	}
-
-	CAN1_Rx_message_read();
-	posF5 = position_5 * 180.0 / M_PI / 65 * 12;
-	speedF5 = velocity_5;
-	torqueF5 = torque_5;
-
-
-	// Command motor 6 and read current CAN message
-	if (motorActivated6) {
-		CAN1_Tx_send_to_motor(motorID6, -rAngle6, 0, Kp6, Kd6, 0); //position mode
-	} else {
-		CAN1_Tx_send_to_motor(motorID6, 0, 0, 0, 0, 0);
-	}
-
-	CAN1_Rx_message_read();
-	posF6 = -position_6 * 180.0 / M_PI / 65 * 12;
-	speedF6 = velocity_6;
-	torqueF6 = torque_6;
-
-
-	// Command motor 7 and read current CAN message
-	if (motorActivated7) {
-		CAN1_Tx_send_to_motor(motorID7, rAngle7, 0, Kp7, Kd7, 0); //position mode
-	} else {
-		CAN1_Tx_send_to_motor(motorID7, 0, 0, 0, 0, 0);
-	}
-
-	CAN1_Rx_message_read();
-	posF7 = position_7 * 180.0 / M_PI / 65 * 12;
-	speedF7 = velocity_7;
-	torqueF7 = torque_7;
-
-	// Command motor 8 and read current CAN message
-	if (motorActivated8) {
-		CAN1_Tx_send_to_motor(motorID8, -rAngle8, 0, Kp8, Kd8, 0); //position mode
-	} else {
-		CAN1_Tx_send_to_motor(motorID8, 0, 0, 0, 0, 0);
-	}
-
-	CAN1_Rx_message_read();
-	posF8 = -position_8 * 180.0 / M_PI / 65 * 12;
-	speedF8 = velocity_8;
-	torqueF8 = torque_8;
+	    if (motorActivated8) CAN1_Tx_send_to_motor(motorID8, -rAngle8, 0, Kp8, Kd8, 0);
+	    else CAN1_Tx_send_to_motor(motorID8, 0, 0, 0, 0, 0);
 
 
 
+	    // PHASE 2: Process all incoming responses
+	    // Loop to read all messages currently available in the FIFO
+	    int messages_read = 0;
+	    while (HAL_CAN_GetRxFifoFillLevel(&hcan1, CAN_RX_FIFO0) > 0 && messages_read < 8) {
+	        CAN1_Rx_message_read(); // This is now a fast, non-blocking call
+	        messages_read++;
+	    }
+
+	    // Now, you can process the updated posF and torqueF variables
+		posF1 = position_1    * 180.0 / M_PI / 65 * 12;
+		speedF1 = velocity_1;
+		torqueF1 = torque_1;
+
+		posF2 = -position_2    * 180.0 / M_PI / 65 * 12;
+		speedF2 = velocity_2;
+		torqueF2 = torque_2;
+
+		posF3 = position_3  * 180.0 / M_PI / 65 * 12;
+		speedF3 = velocity_3;
+		torqueF3 = torque_3;
+
+		posF4 = -position_4 * 180.0 / M_PI / 65 * 12;
+		speedF4 = velocity_4;
+		torqueF4 = torque_4;
+
+		posF5 = position_5 * 180.0 / M_PI / 65 * 12;
+		speedF5 = velocity_5;
+		torqueF5 = torque_5;
+
+		posF6 = -position_6 * 180.0 / M_PI / 65 * 12;
+		speedF6 = velocity_6;
+		torqueF6 = torque_6;
 
 
+		posF7 = position_7 * 180.0 / M_PI / 65 * 12;
+		speedF7 = velocity_7;
+		torqueF7 = torque_7;
+
+
+		posF8 = -position_8 * 180.0 / M_PI / 65 * 12;
+		speedF8 = velocity_8;
+		torqueF8 = torque_8;
 
 }
 
@@ -1110,7 +1062,6 @@ double AngleK4 = 0;
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
     update_control_params = 1;
-    update_button = 1;
 }
 
 

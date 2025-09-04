@@ -249,7 +249,7 @@ double Kd7=0;
 double Kp8=0;
 double Kd8=0;
 
-double samplingTime = 2.5;	//ms
+
 
 double error1, lastError1 = 0;
 double integral1 = 0;
@@ -314,29 +314,6 @@ float torqueF8 = 0;
 float speedF8 = 0;
 float lastPos8;
 float torqSignal8 = 0;
-
-float startTime = 0;
-float currentTime = 0;
-float ttime = 0;
-float ttime1 = 0;
-float ttime2 = 0;
-
-
-
-
-uint32_t RAMP_DURATION = 40; // ms
-
-// MODIFIED Ramp Struct for smooth transitions
-typedef struct {
-    float start;        // Starting value of the ramp
-    float target;       // Desired final value of the ramp
-    float current;      // Current value during the ramp
-    uint32_t startTime; // Tick count when the ramp started
-    uint8_t active;     // Flag to indicate if a ramp is in progress (using uint8_t as boolean)
-    uint32_t duration;  // Duration of the ramp in milliseconds
-} Ramp;
-
-Ramp ramp[4]; // One for each rAngle1 to rAngle4
 
 
 
@@ -414,59 +391,58 @@ int main(void)
 			{
 		Error_Handler();
 	}
-	CAN1_Tx_motor_on(motorID1);
-	CAN1_Tx_motor_zero(motorID1);
 
 
-	char msg[50];
-	sprintf(msg, "Motor 1 Initialized!\r\n");
-	HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
+	// Use a loop to initialize all 8 motors
+	int motorIDs[] = {1, 2, 3, 4, 5, 6, 7, 8};
 
-	CAN1_Tx_motor_on(motorID2);
+	for (int i = 0; i < 8; ++i) {
+	    // 1. Send the motor ON command
+	    CAN1_Tx_motor_on(motorIDs[i]);
 
-	CAN1_Tx_motor_zero(motorID2);
+	    // 2. Send the motor ZERO command to set its home position
+	    CAN1_Tx_motor_zero(motorIDs[i]);
 
-	sprintf(msg, "Motor 2 Initialized!\r\n");
-	HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
-
-	CAN1_Tx_motor_on(motorID3);
-
-	CAN1_Tx_motor_zero(motorID3);;
-
-	sprintf(msg, "Motor 3 Initialized!\r\n");
-	HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
-
-	CAN1_Tx_motor_on(motorID4);
-
-	CAN1_Tx_motor_zero(motorID4);
-
-	sprintf(msg, "Motor 4 Initialized!\r\n");
-	HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
-
-
-	CAN1_Tx_motor_on(motorID5);
-	CAN1_Tx_motor_zero(motorID5);
-	sprintf(msg, "Motor 5 Initialized!\r\n");
-	HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
-
-	CAN1_Tx_motor_on(motorID6);
-	CAN1_Tx_motor_zero(motorID6);
-	sprintf(msg, "Motor 6 Initialized!\r\n");
-	HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
-
-
-	CAN1_Tx_motor_on(motorID7);
-	CAN1_Tx_motor_zero(motorID7);
-	sprintf(msg, "Motor 7 Initialized!\r\n");
-	HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
-
-	CAN1_Tx_motor_on(motorID8);
-	CAN1_Tx_motor_zero(motorID8);
-	sprintf(msg, "Motor 8 Initialized!\r\n");
-	HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
-
-
-
+	}
+//	CAN1_Tx_motor_on(motorID1);
+//	HAL_Delay(50);
+//	CAN1_Tx_motor_zero(motorID1);
+//	HAL_Delay(50);
+//
+//	CAN1_Tx_motor_on(motorID2);
+//	HAL_Delay(50);
+//	CAN1_Tx_motor_zero(motorID2);
+//	HAL_Delay(50);
+//
+//	CAN1_Tx_motor_on(motorID3);
+//	HAL_Delay(50);
+//	CAN1_Tx_motor_zero(motorID3);
+//	HAL_Delay(50);
+//
+//	CAN1_Tx_motor_on(motorID4);
+//	HAL_Delay(50);
+//	CAN1_Tx_motor_zero(motorID4);
+//	HAL_Delay(50);
+//
+//	CAN1_Tx_motor_on(motorID5);
+//	HAL_Delay(50);
+//	CAN1_Tx_motor_zero(motorID5);
+//	HAL_Delay(50);
+//
+//	CAN1_Tx_motor_on(motorID6);
+//	HAL_Delay(50);
+//	CAN1_Tx_motor_zero(motorID6);
+//	HAL_Delay(50);
+//
+//	CAN1_Tx_motor_on(motorID7);
+//	HAL_Delay(50);
+//	CAN1_Tx_motor_zero(motorID7);
+//	HAL_Delay(50);
+//
+//	CAN1_Tx_motor_on(motorID8);
+//	HAL_Delay(50);
+//	CAN1_Tx_motor_zero(motorID8);
+//	HAL_Delay(50);
 
 
 
@@ -604,6 +580,11 @@ static void MX_CAN1_Init(void)
         Error_Handler();
     }
 
+    // New line to enable the CAN TX interrupt
+    if (HAL_CAN_ActivateNotification(&hcan1, CAN_IT_TX_MAILBOX_EMPTY) != HAL_OK) {
+        Error_Handler();
+    }
+
   /* USER CODE END CAN1_Init 2 */
 
 }
@@ -626,9 +607,9 @@ static void MX_TIM6_Init(void)
 
   /* USER CODE END TIM6_Init 1 */
   htim6.Instance = TIM6;
-  htim6.Init.Prescaler = 4-1;
+  htim6.Init.Prescaler = 80-1;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 100000-1;
+  htim6.Init.Period = 5000-1;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
   {
@@ -742,17 +723,14 @@ void CAN1_Tx_motor_on(int motor_id) {
 	TxData[7] = 0xFC;
 
 	while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan1) == 0) {
-		// No available mailbox, wait and retry
-		HAL_Delay(1); // Short delay to prevent a tight loop
-		char msg[50];
-		sprintf(msg, "Transmission needed wait!\r\n");
-		HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
+		HAL_Delay(1);
 	}
 
-	//message is transmitted through CAN
 	if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox) != HAL_OK) {
 		Error_Handler();
 	}
+
+
 
 
 }
@@ -775,19 +753,14 @@ void CAN1_Tx_motor_zero(int motor_id) {
 	TxData[7] = 0xFE;
 
 	while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan1) == 0) {
-		// No available mailbox, wait and retry
-		HAL_Delay(1); // Short delay to prevent a tight loop
-		char msg[50];
-		sprintf(msg, "Transmission needed wait!\r\n");
-		HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
+		HAL_Delay(1);
 	}
 
-	//message is transmitted through CAN
 	if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox) != HAL_OK) {
 		Error_Handler();
 	}
-
 }
+
 
 void CAN1_Tx_motor_off(int motor_id) {
 	TxHeader.DLC = 8;	//data length
@@ -807,26 +780,18 @@ void CAN1_Tx_motor_off(int motor_id) {
 	TxData[7] = 0xFD;
 
 	while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan1) == 0) {
-		// No available mailbox, wait and retry
-		HAL_Delay(1); // Short delay to prevent a tight loop
-		char msg[50];
-		sprintf(msg, "Transmission needed wait!\r\n");
-		HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
+		HAL_Delay(1);
 	}
-	//message is transmitted through CAN
+
 	if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox) != HAL_OK) {
 		Error_Handler();
 	}
 
-//	// Polling method, Wait for message to get out of pending state, that means wait until the message is transmitted successfully.
-//	while (HAL_CAN_IsTxMessagePending(&hcan1, TxMailbox))
-//		;
 }
 
 void CAN1_Tx_send_to_motor(int motor_id, float pos, float vel, float kp,
 		float kd, float torque) {
-//	// For UART
-//	char msg[50];
+
 
 	TxHeader.DLC = 8;	//data length 08 bytes
 	TxHeader.ExtId = 0;
@@ -860,19 +825,15 @@ void CAN1_Tx_send_to_motor(int motor_id, float pos, float vel, float kp,
 	TxData[6] = ((kd_int & 0xF) << 4) | (t_int >> 8); // KP Low 4 bits, Torque High 4 bits
 	TxData[7] = t_int & 0xff; // Torque Low 8 bits
 
+
+
 	while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan1) == 0) {
-		// No available mailbox, wait and retry
-		HAL_Delay(1); // Short delay to prevent a tight loop
-		char msg[50];
-		sprintf(msg, "Transmission needed wait!\r\n");
-		HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
+		HAL_Delay(1);
 	}
-	//message is transmitted through CAN
+
 	if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox) != HAL_OK) {
 		Error_Handler();
 	}
-
-
 }
 
 
@@ -1056,68 +1017,56 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
 
 void signalMotors(float rAngle1, float rAngle2, float rAngle3, float rAngle4, float rAngle5, float rAngle6, float rAngle7, float rAngle8){
 
-	// Command motor 1 and read current CAN message
+
 	if (motorActivated1) {
-		CAN1_Tx_send_to_motor(motorID1, rAngle1, 0, Kp1, Kd1, 0); //position mode
+		CAN1_Tx_send_to_motor(motorID1, rAngle1, 0, Kp1, Kd1, 0);
 	} else {
 		CAN1_Tx_send_to_motor(motorID1, 0, 0, 0, 0, 0);
 	}
 
 
-
-	// Command motor 2 and read current CAN message
 	if (motorActivated2) {
-		CAN1_Tx_send_to_motor(motorID2, -rAngle2, 0, Kp2, Kd2, 0); //position mode
+		CAN1_Tx_send_to_motor(motorID2, -rAngle2, 0, Kp2, Kd2, 0);
 	} else {
 		CAN1_Tx_send_to_motor(motorID2, 0, 0, 0, 0, 0);
 	}
 
 
-	// Command motor 3 and read current CAN message
 	if (motorActivated3) {
-		CAN1_Tx_send_to_motor(motorID3, rAngle3, 0, Kp3, Kd3, 0); //position mode
+		CAN1_Tx_send_to_motor(motorID3, rAngle3, 0, Kp3, Kd3, 0);
 	} else {
 		CAN1_Tx_send_to_motor(motorID3, 0, 0, 0, 0, 0);
 	}
 
 
-	// Command motor 4 and read current CAN message
 	if (motorActivated4) {
-		CAN1_Tx_send_to_motor(motorID4, -rAngle4, 0, Kp4, Kd4, 0); //position mode
+		CAN1_Tx_send_to_motor(motorID4, -rAngle4, 0, Kp4, Kd4, 0);
 	} else {
 		CAN1_Tx_send_to_motor(motorID4, 0, 0, 0, 0, 0);
 	}
 
 
-
-	// Command motor 5 and read current CAN message
 	if (motorActivated5) {
-		CAN1_Tx_send_to_motor(motorID5, rAngle5, 0, Kp5, Kd5, 0); //position mode
+		CAN1_Tx_send_to_motor(motorID5, rAngle5, 0, Kp5, Kd5, 0);
 	} else {
 		CAN1_Tx_send_to_motor(motorID5, 0, 0, 0, 0, 0);
 	}
 
-
-	// Command motor 6 and read current CAN message
 	if (motorActivated6) {
-		CAN1_Tx_send_to_motor(motorID6, -rAngle6, 0, Kp6, Kd6, 0); //position mode
+		CAN1_Tx_send_to_motor(motorID6, -rAngle6, 0, Kp6, Kd6, 0);
 	} else {
 		CAN1_Tx_send_to_motor(motorID6, 0, 0, 0, 0, 0);
 	}
 
 
-
-	// Command motor 7 and read current CAN message
 	if (motorActivated7) {
-		CAN1_Tx_send_to_motor(motorID7, rAngle7, 0, Kp7, Kd7, 0); //position mode
+		CAN1_Tx_send_to_motor(motorID7, rAngle7, 0, Kp7, Kd7, 0);
 	} else {
 		CAN1_Tx_send_to_motor(motorID7, 0, 0, 0, 0, 0);
 	}
 
-
-	// Command motor 8 and read current CAN message
 	if (motorActivated8) {
-		CAN1_Tx_send_to_motor(motorID8, -rAngle8, 0, Kp8, Kd8, 0); //position mode
+		CAN1_Tx_send_to_motor(motorID8, -rAngle8, 0, Kp8, Kd8, 0);
 	} else {
 		CAN1_Tx_send_to_motor(motorID8, 0, 0, 0, 0, 0);
 	}

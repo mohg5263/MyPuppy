@@ -54,6 +54,7 @@ volatile char uart_msg_buffer[50];
 /* Private variables ---------------------------------------------------------*/
 CAN_HandleTypeDef hcan1;
 
+TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim6;
 
 UART_HandleTypeDef huart2;
@@ -81,6 +82,7 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_CAN1_Init(void);
 static void MX_TIM6_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 void CAN1_Tx_motor_on(int);
 void CAN1_Tx_motor_zero(int);
@@ -251,6 +253,8 @@ double Kd8=0;
 
 
 
+
+
 double error1, lastError1 = 0;
 double integral1 = 0;
 double derivative1;
@@ -315,6 +319,15 @@ float speedF8 = 0;
 float lastPos8;
 float torqSignal8 = 0;
 
+float startTime = 0;
+float currentTime = 0;
+float ttime = 0;
+float ttime1 = 0;
+float ttime2 = 0;
+
+
+
+
 
 
 
@@ -348,7 +361,6 @@ float uint_to_float(int x_int, float x_min, float x_max, int bits) {
 	float offset = x_min;
 	return ((float) x_int) * span / ((float) ((1 << bits) - 1)) + offset;
 }
-
 
 
 
@@ -386,6 +398,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_CAN1_Init();
   MX_TIM6_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 	if (HAL_CAN_Start(&hcan1) != HAL_OK) //CAN is started and checked for error.
 			{
@@ -404,50 +417,13 @@ int main(void)
 	    CAN1_Tx_motor_zero(motorIDs[i]);
 
 	}
-//	CAN1_Tx_motor_on(motorID1);
-//	HAL_Delay(50);
-//	CAN1_Tx_motor_zero(motorID1);
-//	HAL_Delay(50);
-//
-//	CAN1_Tx_motor_on(motorID2);
-//	HAL_Delay(50);
-//	CAN1_Tx_motor_zero(motorID2);
-//	HAL_Delay(50);
-//
-//	CAN1_Tx_motor_on(motorID3);
-//	HAL_Delay(50);
-//	CAN1_Tx_motor_zero(motorID3);
-//	HAL_Delay(50);
-//
-//	CAN1_Tx_motor_on(motorID4);
-//	HAL_Delay(50);
-//	CAN1_Tx_motor_zero(motorID4);
-//	HAL_Delay(50);
-//
-//	CAN1_Tx_motor_on(motorID5);
-//	HAL_Delay(50);
-//	CAN1_Tx_motor_zero(motorID5);
-//	HAL_Delay(50);
-//
-//	CAN1_Tx_motor_on(motorID6);
-//	HAL_Delay(50);
-//	CAN1_Tx_motor_zero(motorID6);
-//	HAL_Delay(50);
-//
-//	CAN1_Tx_motor_on(motorID7);
-//	HAL_Delay(50);
-//	CAN1_Tx_motor_zero(motorID7);
-//	HAL_Delay(50);
-//
-//	CAN1_Tx_motor_on(motorID8);
-//	HAL_Delay(50);
-//	CAN1_Tx_motor_zero(motorID8);
-//	HAL_Delay(50);
+
 
 
 
 	// Start timer
 	HAL_TIM_Base_Start_IT(&htim6);
+	HAL_TIM_Base_Start_IT(&htim2);
 
 
 
@@ -580,12 +556,52 @@ static void MX_CAN1_Init(void)
         Error_Handler();
     }
 
-    // New line to enable the CAN TX interrupt
-    if (HAL_CAN_ActivateNotification(&hcan1, CAN_IT_TX_MAILBOX_EMPTY) != HAL_OK) {
-        Error_Handler();
-    }
-
   /* USER CODE END CAN1_Init 2 */
+
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 80-1;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 65535;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
 
 }
 
@@ -607,9 +623,9 @@ static void MX_TIM6_Init(void)
 
   /* USER CODE END TIM6_Init 1 */
   htim6.Instance = TIM6;
-  htim6.Init.Prescaler = 80-1;
+  htim6.Init.Prescaler = 4-1;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 5000-1;
+  htim6.Init.Period = 50000-1;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
   {
@@ -723,7 +739,7 @@ void CAN1_Tx_motor_on(int motor_id) {
 	TxData[7] = 0xFC;
 
 	while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan1) == 0) {
-		HAL_Delay(1);
+
 	}
 
 	if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox) != HAL_OK) {
@@ -914,105 +930,6 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
 
 
 
-//
-//
-//
-//
-//void CAN1_Rx_message_read(void) {
-//
-////	char msg[50];	//for showing over the UART
-//
-//	//we are waiting for at least one message into the RX FIFO0. When that happens, the following code will get out of the loop.
-//	//In RX FIFO, you can store 03 CAN messages.
-//	uint32_t startTick = HAL_GetTick();
-//	while (!HAL_CAN_GetRxFifoFillLevel(&hcan1, CAN_RX_FIFO0))
-//	{
-//	    if (HAL_GetTick() - startTick > 10)  // 100 ms timeout
-//	    {
-//	        // handle timeout
-//	        return;
-//	    }
-//	}
-//
-//	//Polling based reception of message
-//	if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK) //we have to specify the FIFO number
-//			{
-//		Error_Handler();
-//	}
-//
-//	//Unpacking the received parameter integers from the RxData
-//	int id = RxData[0]; //motor ID
-//	int p_int = (RxData[1] << 8) | RxData[2];	//Motor position data
-//	int v_int = (RxData[3] << 4) | (RxData[4] >> 4);	//Motor velocity data
-//	int i_int = ((RxData[4] & 0xF) << 8) | RxData[5];	//Motor torque data
-//	int T_int = RxData[6];	//temperature data
-//	/// convert int to float
-//	float p = uint_to_float(p_int, P_MIN, P_MAX, 16);
-//	float v = uint_to_float(v_int, V_MIN, V_MAX, 12);
-//	float i = uint_to_float(i_int, T_MIN, T_MAX, 12);
-//	float T = T_int;
-//	if (id == motorID1)	//if motor 1 data is received
-//			{
-//		position_1 = p; // Read corresponding data based on ID
-//		velocity_1 = v;
-//		torque_1 = i;
-//		temp_1 = T - 40; // Temperature range: -40~215
-//	}
-//	if (id == motorID2)	//if motor 1 data is received
-//			{
-//		position_2 = p; // Read corresponding data based on ID
-//		velocity_2 = v;
-//		torque_2 = i;
-//		temp_2 = T - 40; // Temperature range: -40~215
-//	}
-//	if (id == motorID3)	//if motor 1 data is received
-//			{
-//		position_3 = p; // Read corresponding data based on ID
-//		velocity_3 = v;
-//		torque_3 = i;
-//		temp_3 = T - 40; // Temperature range: -40~215
-//	}
-//	if (id == motorID4)	//if motor 1 data is received
-//			{
-//		position_4 = p; // Read corresponding data based on ID
-//		velocity_4 = v;
-//		torque_4 = i;
-//		temp_4 = T - 40; // Temperature range: -40~215
-//	}
-//	if (id == motorID5)	//if motor 1 data is received
-//			{
-//		position_5 = p; // Read corresponding data based on ID
-//		velocity_5 = v;
-//		torque_5 = i;
-//		temp_5 = T - 40; // Temperature range: -40~215
-//	}
-//	if (id == motorID6)	//if motor 1 data is received
-//			{
-//		position_6 = p; // Read corresponding data based on ID
-//		velocity_6 = v;
-//		torque_6 = i;
-//		temp_6 = T - 40; // Temperature range: -40~215
-//	}
-//
-//	if (id == motorID7)	//if motor 1 data is received
-//			{
-//		position_7 = p; // Read corresponding data based on ID
-//		velocity_7 = v;
-//		torque_7 = i;
-//		temp_7 = T - 40; // Temperature range: -40~215
-//	}
-//
-//	if (id == motorID8)	//if motor 1 data is received
-//			{
-//		position_8 = p; // Read corresponding data based on ID
-//		velocity_8 = v;
-//		torque_8 = i;
-//		temp_8 = T - 40; // Temperature range: -40~215
-//	}
-//
-//}
-
-
 
 
 void signalMotors(float rAngle1, float rAngle2, float rAngle3, float rAngle4, float rAngle5, float rAngle6, float rAngle7, float rAngle8){
@@ -1110,8 +1027,10 @@ typedef struct {
 // IK function
 IKResult IK(float x, float y, float theta2_min, float theta2_max)
 {
-    const float l1 = 14.17*0.0254;
-    const float l2 = 9.25*0.0254;
+    const float l1 = 14.50*0.0254;
+    const float l2 = 13.50*0.0254;
+
+
 
     // Joint limits in radians
     const float theta1_min = -60 * M_PI/180; // -60 deg
@@ -1173,12 +1092,14 @@ IKResult IK(float x, float y, float theta2_min, float theta2_max)
 void updateControlParameters() {
 	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
 
-	double Kp_stand=0.5;
-	double Kd_stand=0.1;
+	double Kp_stand=1.0;
+	double Kd_stand=0.2;
+
+
 
     // **Limb 1 Control
     X1 = 0;
-    Y1 = -0.595+height1;
+    Y1 = -0.711+height1;
 
     IKResult sol1 = IK(X1, Y1, -130,50);
 
@@ -1193,7 +1114,7 @@ void updateControlParameters() {
 
     // **Limb 2 Control
     X2 = 0;
-    Y2 = -0.595+height2;
+    Y2 = -0.711+height2;
 
     IKResult sol2 = IK(X2, Y2, -50, 130);
 
@@ -1207,30 +1128,30 @@ void updateControlParameters() {
 
     // **Limb 3 Control
     X3 = 0;
-    Y3 = -0.595+height3;
+    Y3 = -0.711+height3;
 
     IKResult sol3 = IK(X3, Y3, -50, 130);
 
     AngleH3=sol3.theta1_down * 180.0f / M_PI;
     AngleK3=sol3.theta2_down * 180.0f / M_PI;
 
-    Kp5=Kp_stand;
+    Kp5=Kp_stand*1.3;
     Kd5=Kd_stand;
-    Kp6=Kp_stand;
+    Kp6=Kp_stand*1.3;
     Kd6=Kd_stand;
 
     // **Limb 4 Control
     X4 = 0;
-    Y4 = -0.595+height4;
+    Y4 = -0.711+height4;
 
     IKResult sol4 = IK(X4, Y4, -130, 50);
 
     AngleH4=sol4.theta1_up * 180.0f / M_PI;
     AngleK4=sol4.theta2_up * 180.0f / M_PI;
 
-    Kp7=Kp_stand;
+    Kp7=Kp_stand*1.3;
     Kd7=Kd_stand;
-    Kp8=Kp_stand;
+    Kp8=Kp_stand*1.3;
     Kd8=Kd_stand;
 
 

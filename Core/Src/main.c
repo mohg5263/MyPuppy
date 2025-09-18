@@ -220,12 +220,12 @@ int motorID8 = 8;
 
 int motorActivated1 = 1;
 int motorActivated2 = 1;
-int motorActivated3 = 1;
-int motorActivated4 = 1;
-int motorActivated5 = 1;
-int motorActivated6 = 1;
-int motorActivated7 = 1;
-int motorActivated8 = 1;
+int motorActivated3 = 0;
+int motorActivated4 = 0;
+int motorActivated5 = 0;
+int motorActivated6 = 0;
+int motorActivated7 = 0;
+int motorActivated8 = 0;
 
 double Kp1=0;
 double Kd1=0;
@@ -327,10 +327,16 @@ float ttime2 = 0;
 
 
 
+// Global constants for link lengths
+const float l1 = 14.50 * 0.0254;
+const float l2 = 13.50 * 0.0254;
 
 
 
-
+uint32_t init_tick;
+volatile uint32_t microseconds_elapsed = 0;
+volatile uint32_t timer_overflows = 0;
+float seconds_elapsed = 0;
 
 
 //********************************************************************************
@@ -424,7 +430,6 @@ int main(void)
 	// Start timer
 	HAL_TIM_Base_Start_IT(&htim6);
 	HAL_TIM_Base_Start_IT(&htim2);
-
 
 
 
@@ -600,6 +605,7 @@ static void MX_TIM2_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN TIM2_Init 2 */
+  __HAL_TIM_ENABLE_IT(&htim2, TIM_IT_UPDATE);
 
   /* USER CODE END TIM2_Init 2 */
 
@@ -1011,6 +1017,9 @@ double AngleK4 = 0;
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
     update_control_params = 1;
     update_button = 1;
+    if (htim->Instance == TIM2) {
+        timer_overflows++;
+    }
 }
 
 
@@ -1027,8 +1036,8 @@ typedef struct {
 // IK function
 IKResult IK(float x, float y, float theta2_min, float theta2_max)
 {
-    const float l1 = 14.50*0.0254;
-    const float l2 = 13.50*0.0254;
+//    const float l1 = 14.50*0.0254;
+//    const float l2 = 13.50*0.0254;
 
 
 
@@ -1092,6 +1101,24 @@ IKResult IK(float x, float y, float theta2_min, float theta2_max)
 void updateControlParameters() {
 	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
 
+	// Get a temporary copy of the variables to prevent race conditions
+	uint32_t overflows = timer_overflows;
+	uint32_t current_tick = __HAL_TIM_GET_COUNTER(&htim2);
+
+	// Check for a pending overflow. If an overflow happens right after we read the counter
+	// but before we read the overflow variable, our calculation will be off.
+	// The TIM_SR_UIF bit is the Update Interrupt Flag.
+	if (__HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_UPDATE) != RESET) {
+		overflows++;
+	}
+
+	// Calculate total elapsed microseconds
+	microseconds_elapsed = (overflows * 65536) + current_tick;
+	// Note: The period of 65535 means it counts from 0 to 65535,
+	// which is 65536 total ticks.
+	seconds_elapsed = (float)microseconds_elapsed / 1000000.0f;
+
+
 	double Kp_stand=1.0;
 	double Kd_stand=0.2;
 
@@ -1099,7 +1126,7 @@ void updateControlParameters() {
 
     // **Limb 1 Control
     X1 = 0;
-    Y1 = -0.711+height1;
+    Y1 = -(l1+l2)+height1;
 
     IKResult sol1 = IK(X1, Y1, -130,50);
 
@@ -1114,7 +1141,7 @@ void updateControlParameters() {
 
     // **Limb 2 Control
     X2 = 0;
-    Y2 = -0.711+height2;
+    Y2 = -(l1+l2)+height2;
 
     IKResult sol2 = IK(X2, Y2, -50, 130);
 
@@ -1128,30 +1155,30 @@ void updateControlParameters() {
 
     // **Limb 3 Control
     X3 = 0;
-    Y3 = -0.711+height3;
+    Y3 = -(l1+l2)+height3;
 
     IKResult sol3 = IK(X3, Y3, -50, 130);
 
     AngleH3=sol3.theta1_down * 180.0f / M_PI;
     AngleK3=sol3.theta2_down * 180.0f / M_PI;
 
-    Kp5=Kp_stand*1.3;
+    Kp5=Kp_stand;
     Kd5=Kd_stand;
-    Kp6=Kp_stand*1.3;
+    Kp6=Kp_stand;
     Kd6=Kd_stand;
 
     // **Limb 4 Control
     X4 = 0;
-    Y4 = -0.711+height4;
+    Y4 = -(l1+l2)+height4;
 
     IKResult sol4 = IK(X4, Y4, -130, 50);
 
     AngleH4=sol4.theta1_up * 180.0f / M_PI;
     AngleK4=sol4.theta2_up * 180.0f / M_PI;
 
-    Kp7=Kp_stand*1.3;
+    Kp7=Kp_stand;
     Kd7=Kd_stand;
-    Kp8=Kp_stand*1.3;
+    Kp8=Kp_stand;
     Kd8=Kd_stand;
 
 
@@ -1173,6 +1200,100 @@ void updateControlParameters() {
 
     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
 }
+
+
+
+
+// Structure to hold the output of leg_xy
+typedef struct {
+    double x;
+    double y;
+} LegPosition;
+
+// Function to compute the x and y coordinates for a single leg
+LegPosition leg_xy(double t, double T, double beta, double L, double H, double phaseFrac) {
+    LegPosition pos;
+
+    double height = l1 + l2 - 0.2;
+
+    double offset = phaseFrac * T;
+    double local_t = fmod(t - offset, T);
+
+    if (local_t < 0) {
+        local_t += T; // Ensure positive modulo result
+    }
+
+    double v = L / (beta * T);
+
+    if (local_t < beta * T) {
+        // Stance phase
+        pos.x = L / 2.0 - v * local_t;
+        pos.y = -height;
+    } else {
+        // Swing phase
+        double tau = (local_t - beta * T) / ((1 - beta) * T);
+        pos.x = -L / 2.0 - v * tau + 3.0 * (L + v) * pow(tau, 2) - 2.0 * (L + v) * pow(tau, 3);
+        pos.y = -height + H * (1.0 - cos(2.0 * M_PI * tau));
+    }
+    return pos;
+}
+
+// Structure to hold the outputs of getLegPositions
+typedef struct {
+    LegPosition lf;
+    LegPosition rh;
+    LegPosition rf;
+    LegPosition lh;
+} LegPositions;
+
+// Main function to get all four leg positions
+LegPositions getLegPositions(double t) {
+    LegPositions all_pos;
+
+    // Global gait parameters
+    double T = 1.0;
+    double beta = 0.75;
+    double L = 0.20;
+    double H = 0.05;
+
+    // Phase offsets
+    double ph_LF = 0.00;
+    double ph_RH = 0.25;
+    double ph_RF = 0.50;
+    double ph_LH = 0.75;
+
+    // Gait selection
+    int gait = 2; // 1: Walk, 2: Trot
+
+    double l1 = 0.3124;
+    double l2 = 0.34;
+    double initial_height = l1 + l2 - 0.2;
+
+    if (t <= 2.0) {
+        // Initial configuration
+        all_pos.lf.x = 0.0; all_pos.lf.y = -initial_height;
+        all_pos.rh.x = 0.0; all_pos.rh.y = -initial_height;
+        all_pos.rf.x = 0.0; all_pos.rf.y = -initial_height;
+        all_pos.lh.x = 0.0; all_pos.lh.y = -initial_height;
+    } else {
+        if (gait == 1) { // Walk
+            all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
+            all_pos.rh = leg_xy(t, T, beta, L, H, ph_RH);
+            all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
+            all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH);
+        } else if (gait == 2) { // Trot
+            all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
+            all_pos.rh = leg_xy(t, T, beta, L, H, ph_LF); // Same phase as LF
+            all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
+            all_pos.lh = leg_xy(t, T, beta, L, H, ph_RF); // Same phase as RF
+        }
+    }
+
+    return all_pos;
+}
+
+
+
 
 
 

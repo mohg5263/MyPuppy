@@ -339,6 +339,12 @@ volatile uint32_t timer_overflows = 0;
 float seconds_elapsed = 0;
 
 
+double T = 2.0;
+double beta = 0.75;
+double L = 0.20;
+double H = 0.1;
+
+
 //********************************************************************************
 
 float saturate(float x, float x_min, float x_max) {
@@ -1098,111 +1104,6 @@ IKResult IK(float x, float y, float theta2_min, float theta2_max)
 
 
 
-void updateControlParameters() {
-	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
-
-	// Get a temporary copy of the variables to prevent race conditions
-	uint32_t overflows = timer_overflows;
-	uint32_t current_tick = __HAL_TIM_GET_COUNTER(&htim2);
-
-	// Check for a pending overflow. If an overflow happens right after we read the counter
-	// but before we read the overflow variable, our calculation will be off.
-	// The TIM_SR_UIF bit is the Update Interrupt Flag.
-	if (__HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_UPDATE) != RESET) {
-		overflows++;
-	}
-
-	// Calculate total elapsed microseconds
-	microseconds_elapsed = (overflows * 65536) + current_tick;
-	// Note: The period of 65535 means it counts from 0 to 65535,
-	// which is 65536 total ticks.
-	seconds_elapsed = (float)microseconds_elapsed / 1000000.0f;
-
-
-	double Kp_stand=1.0;
-	double Kd_stand=0.2;
-
-
-
-    // **Limb 1 Control
-    X1 = 0;
-    Y1 = -(l1+l2)+height1;
-
-    IKResult sol1 = IK(X1, Y1, -130,50);
-
-    AngleH1=sol1.theta1_up * 180.0f / M_PI;
-    AngleK1=sol1.theta2_up * 180.0f / M_PI;
-
-    Kp1=Kp_stand;
-    Kd1=Kd_stand;
-    Kp2=Kp_stand;
-    Kd2=Kd_stand;
-
-
-    // **Limb 2 Control
-    X2 = 0;
-    Y2 = -(l1+l2)+height2;
-
-    IKResult sol2 = IK(X2, Y2, -50, 130);
-
-    AngleH2=sol2.theta1_down * 180.0f / M_PI;
-    AngleK2=sol2.theta2_down * 180.0f / M_PI;
-
-    Kp3=Kp_stand;
-    Kd3=Kd_stand;
-    Kp4=Kp_stand;
-    Kd4=Kd_stand;
-
-    // **Limb 3 Control
-    X3 = 0;
-    Y3 = -(l1+l2)+height3;
-
-    IKResult sol3 = IK(X3, Y3, -50, 130);
-
-    AngleH3=sol3.theta1_down * 180.0f / M_PI;
-    AngleK3=sol3.theta2_down * 180.0f / M_PI;
-
-    Kp5=Kp_stand;
-    Kd5=Kd_stand;
-    Kp6=Kp_stand;
-    Kd6=Kd_stand;
-
-    // **Limb 4 Control
-    X4 = 0;
-    Y4 = -(l1+l2)+height4;
-
-    IKResult sol4 = IK(X4, Y4, -130, 50);
-
-    AngleH4=sol4.theta1_up * 180.0f / M_PI;
-    AngleK4=sol4.theta2_up * 180.0f / M_PI;
-
-    Kp7=Kp_stand;
-    Kd7=Kd_stand;
-    Kp8=Kp_stand;
-    Kd8=Kd_stand;
-
-
-
-	rAngle1 = AngleH1 * M_PI * 65 / (12 * 180.0);
-	rAngle2 = AngleK1 * M_PI * 65 / (12 * 180.0);
-	rAngle3 = AngleH2 * M_PI * 65 / (12 * 180.0);
-	rAngle4 = AngleK2 * M_PI * 65 / (12 * 180.0);
-	rAngle5 = AngleH3 * M_PI * 65 / (12 * 180.0);
-	rAngle6 = AngleK3 * M_PI * 65 / (12 * 180.0);
-	rAngle7 = AngleH4 * M_PI * 65 / (12 * 180.0);
-	rAngle8 = AngleK4 * M_PI * 65 / (12 * 180.0);
-
-
-
-    signalMotors(rAngle1, rAngle2, rAngle3, rAngle4, rAngle5, rAngle6, rAngle7, rAngle8);
-
-
-
-    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
-}
-
-
-
 
 // Structure to hold the output of leg_xy
 typedef struct {
@@ -1238,6 +1139,9 @@ LegPosition leg_xy(double t, double T, double beta, double L, double H, double p
     return pos;
 }
 
+
+
+
 // Structure to hold the outputs of getLegPositions
 typedef struct {
     LegPosition lf;
@@ -1250,11 +1154,11 @@ typedef struct {
 LegPositions getLegPositions(double t) {
     LegPositions all_pos;
 
-    // Global gait parameters
-    double T = 1.0;
-    double beta = 0.75;
-    double L = 0.20;
-    double H = 0.05;
+//    // Global gait parameters
+//    double T = 2.0;
+//    double beta = 0.75;
+//    double L = 0.20;
+//    double H = 0.1;
 
     // Phase offsets
     double ph_LF = 0.00;
@@ -1291,6 +1195,112 @@ LegPositions getLegPositions(double t) {
 
     return all_pos;
 }
+
+
+
+
+
+void updateControlParameters() {
+	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
+
+	// Get a temporary copy of the variables to prevent race conditions
+	uint32_t overflows = timer_overflows;
+	uint32_t current_tick = __HAL_TIM_GET_COUNTER(&htim2);
+
+	// Check for a pending overflow. If an overflow happens right after we read the counter
+	// but before we read the overflow variable, our calculation will be off.
+	// The TIM_SR_UIF bit is the Update Interrupt Flag.
+	if (__HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_UPDATE) != RESET) {
+		overflows++;
+	}
+
+	// Calculate total elapsed microseconds
+	microseconds_elapsed = (overflows * 65536) + current_tick;
+	// Note: The period of 65535 means it counts from 0 to 65535,
+	// which is 65536 total ticks.
+	seconds_elapsed = (float)microseconds_elapsed / 1000000.0f;
+
+
+
+	LegPositions xyCoords = getLegPositions(seconds_elapsed);
+
+
+
+	double Kp_stand=1.0;
+	double Kd_stand=0.2;
+
+
+
+
+    IKResult sol1 = IK(xyCoords.lh.x , xyCoords.lh.y , -130,50);
+
+    AngleH1=sol1.theta1_up * 180.0f / M_PI;
+    AngleK1=sol1.theta2_up * 180.0f / M_PI;
+
+    Kp1=Kp_stand;
+    Kd1=Kd_stand;
+    Kp2=Kp_stand;
+    Kd2=Kd_stand;
+
+
+
+    IKResult sol2 = IK(xyCoords.lh.x, xyCoords.lh.y, -50, 130);
+
+    AngleH2=sol2.theta1_down * 180.0f / M_PI;
+    AngleK2=sol2.theta2_down * 180.0f / M_PI;
+
+    Kp3=Kp_stand;
+    Kd3=Kd_stand;
+    Kp4=Kp_stand;
+    Kd4=Kd_stand;
+
+
+    // **Limb 3 Control
+    IKResult sol3 = IK(xyCoords.lh.x, xyCoords.lh.y, -50, 130);
+
+    AngleH3=sol3.theta1_down * 180.0f / M_PI;
+    AngleK3=sol3.theta2_down * 180.0f / M_PI;
+
+    Kp5=Kp_stand;
+    Kd5=Kd_stand;
+    Kp6=Kp_stand;
+    Kd6=Kd_stand;
+
+    // **Limb 4 Control
+
+
+    IKResult sol4 = IK(xyCoords.lh.x, xyCoords.lh.y, -130, 50);
+
+    AngleH4=sol4.theta1_up * 180.0f / M_PI;
+    AngleK4=sol4.theta2_up * 180.0f / M_PI;
+
+    Kp7=Kp_stand;
+    Kd7=Kd_stand;
+    Kp8=Kp_stand;
+    Kd8=Kd_stand;
+
+
+
+	rAngle1 = AngleH1 * M_PI * 65 / (12 * 180.0);
+	rAngle2 = AngleK1 * M_PI * 65 / (12 * 180.0);
+	rAngle3 = AngleH2 * M_PI * 65 / (12 * 180.0);
+	rAngle4 = AngleK2 * M_PI * 65 / (12 * 180.0);
+	rAngle5 = AngleH3 * M_PI * 65 / (12 * 180.0);
+	rAngle6 = AngleK3 * M_PI * 65 / (12 * 180.0);
+	rAngle7 = AngleH4 * M_PI * 65 / (12 * 180.0);
+	rAngle8 = AngleK4 * M_PI * 65 / (12 * 180.0);
+
+
+
+    signalMotors(rAngle1, rAngle2, rAngle3, rAngle4, rAngle5, rAngle6, rAngle7, rAngle8);
+
+
+
+    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
+}
+
+
+
 
 
 

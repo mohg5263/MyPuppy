@@ -222,8 +222,8 @@ int motorActivated1 = 1;
 int motorActivated2 = 1;
 int motorActivated3 = 1;
 int motorActivated4 = 1;
-int motorActivated5 = 0;
-int motorActivated6 = 0;
+int motorActivated5 = 1;
+int motorActivated6 = 1;
 int motorActivated7 = 0;
 int motorActivated8 = 0;
 
@@ -1256,7 +1256,7 @@ void updateControlParameters() {
 
 
     // **Limb 3 Control
-    IKResult sol3 = IK(xyCoords.lh.x, xyCoords.lh.y, -50, 130);
+    IKResult sol3 = IK(xyCoords.lf.x, xyCoords.lf.y, -50, 130);
 
     AngleH3=sol3.theta1_down * 180.0f / M_PI;
     AngleK3=sol3.theta2_down * 180.0f / M_PI;

@@ -186,21 +186,7 @@ float rAngle6=0;
 float rAngle7=0;
 float rAngle8=0;
 
-float height1=0;
-float X1=0;
-float Y1=0;
 
-float height2=0;
-float X2=0;
-float Y2=0;
-
-float height3=0;
-float X3=0;
-float Y3=0;
-
-float height4=0;
-float X4=0;
-float Y4=0;
 
 //********************************************************************************
 
@@ -334,7 +320,7 @@ const float l2 = 13.50 * 0.0254;
 
 
 uint32_t init_tick;
-volatile uint32_t microseconds_elapsed = 0;
+
 volatile uint32_t timer_overflows = 0;
 float seconds_elapsed = 0;
 
@@ -344,6 +330,13 @@ double beta = 0.75;
 double L = 0.20;
 double H = 0.1;
 
+
+
+double Kp_H=1.0;
+double Kd_H=0.2;
+
+double Kp_K=1.0;
+double Kd_K=0.2;
 
 //********************************************************************************
 
@@ -757,11 +750,11 @@ void CAN1_Tx_motor_on(int motor_id) {
 	if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox) != HAL_OK) {
 		Error_Handler();
 	}
-
-
-
-
 }
+
+
+
+
 
 void CAN1_Tx_motor_zero(int motor_id) {
 	TxHeader.DLC = 8;	//data length
@@ -948,54 +941,54 @@ void signalMotors(float rAngle1, float rAngle2, float rAngle3, float rAngle4, fl
 
 
 	if (motorActivated1) {
-		CAN1_Tx_send_to_motor(motorID1, rAngle1, 0, Kp1, Kd1, 0);
+		CAN1_Tx_send_to_motor(motorID1, rAngle1, 0, Kp_H, Kd_H, 0);
 	} else {
 		CAN1_Tx_send_to_motor(motorID1, 0, 0, 0, 0, 0);
 	}
 
 
 	if (motorActivated2) {
-		CAN1_Tx_send_to_motor(motorID2, -rAngle2, 0, Kp2, Kd2, 0);
+		CAN1_Tx_send_to_motor(motorID2, -rAngle2, 0, Kp_K, Kd_K, 0);
 	} else {
 		CAN1_Tx_send_to_motor(motorID2, 0, 0, 0, 0, 0);
 	}
 
 
 	if (motorActivated3) {
-		CAN1_Tx_send_to_motor(motorID3, rAngle3, 0, Kp3, Kd3, 0);
+		CAN1_Tx_send_to_motor(motorID3, rAngle3, 0, Kp_H, Kd_H, 0);
 	} else {
 		CAN1_Tx_send_to_motor(motorID3, 0, 0, 0, 0, 0);
 	}
 
 
 	if (motorActivated4) {
-		CAN1_Tx_send_to_motor(motorID4, -rAngle4, 0, Kp4, Kd4, 0);
+		CAN1_Tx_send_to_motor(motorID4, -rAngle4, 0, Kp_K, Kd_K, 0);
 	} else {
 		CAN1_Tx_send_to_motor(motorID4, 0, 0, 0, 0, 0);
 	}
 
 
 	if (motorActivated5) {
-		CAN1_Tx_send_to_motor(motorID5, rAngle5, 0, Kp5, Kd5, 0);
+		CAN1_Tx_send_to_motor(motorID5, rAngle5, 0, Kp_H, Kd_H, 0);
 	} else {
 		CAN1_Tx_send_to_motor(motorID5, 0, 0, 0, 0, 0);
 	}
 
 	if (motorActivated6) {
-		CAN1_Tx_send_to_motor(motorID6, -rAngle6, 0, Kp6, Kd6, 0);
+		CAN1_Tx_send_to_motor(motorID6, -rAngle6, 0, Kp_K, Kd_K, 0);
 	} else {
 		CAN1_Tx_send_to_motor(motorID6, 0, 0, 0, 0, 0);
 	}
 
 
 	if (motorActivated7) {
-		CAN1_Tx_send_to_motor(motorID7, rAngle7, 0, Kp7, Kd7, 0);
+		CAN1_Tx_send_to_motor(motorID7, rAngle7, 0, Kp_H, Kd_H, 0);
 	} else {
 		CAN1_Tx_send_to_motor(motorID7, 0, 0, 0, 0, 0);
 	}
 
 	if (motorActivated8) {
-		CAN1_Tx_send_to_motor(motorID8, -rAngle8, 0, Kp8, Kd8, 0);
+		CAN1_Tx_send_to_motor(motorID8, -rAngle8, 0, Kp_K, Kd_K, 0);
 	} else {
 		CAN1_Tx_send_to_motor(motorID8, 0, 0, 0, 0, 0);
 	}
@@ -1167,7 +1160,7 @@ LegPositions getLegPositions(double t) {
     double ph_LH = 0.75;
 
     // Gait selection
-    int gait = 2; // 1: Walk, 2: Trot
+    int gait = 1; // 1: Walk, 2: Trot
 
     double l1 = 0.3124;
     double l2 = 0.34;
@@ -1215,7 +1208,7 @@ void updateControlParameters() {
 	}
 
 	// Calculate total elapsed microseconds
-	microseconds_elapsed = (overflows * 65536) + current_tick;
+	uint32_t microseconds_elapsed = (overflows * 65536) + current_tick;
 	// Note: The period of 65535 means it counts from 0 to 65535,
 	// which is 65536 total ticks.
 	seconds_elapsed = (float)microseconds_elapsed / 1000000.0f;
@@ -1226,22 +1219,10 @@ void updateControlParameters() {
 
 
 
-	double Kp_stand=1.0;
-	double Kd_stand=0.2;
-
-
-
-
     IKResult sol1 = IK(xyCoords.lh.x , xyCoords.lh.y , -130,50);
 
     AngleH1=sol1.theta1_up * 180.0f / M_PI;
     AngleK1=sol1.theta2_up * 180.0f / M_PI;
-
-    Kp1=Kp_stand;
-    Kd1=Kd_stand;
-    Kp2=Kp_stand;
-    Kd2=Kd_stand;
-
 
 
     IKResult sol2 = IK(-xyCoords.rh.x, xyCoords.rh.y, -50, 130);
@@ -1249,10 +1230,6 @@ void updateControlParameters() {
     AngleH2=sol2.theta1_down * 180.0f / M_PI;
     AngleK2=sol2.theta2_down * 180.0f / M_PI;
 
-    Kp3=Kp_stand;
-    Kd3=Kd_stand;
-    Kp4=Kp_stand;
-    Kd4=Kd_stand;
 
 
     // **Limb 3 Control
@@ -1261,10 +1238,6 @@ void updateControlParameters() {
     AngleH3=sol3.theta1_down * 180.0f / M_PI;
     AngleK3=sol3.theta2_down * 180.0f / M_PI;
 
-    Kp5=Kp_stand;
-    Kd5=Kd_stand;
-    Kp6=Kp_stand;
-    Kd6=Kd_stand;
 
     // **Limb 4 Control
 
@@ -1274,10 +1247,6 @@ void updateControlParameters() {
     AngleH4=sol4.theta1_up * 180.0f / M_PI;
     AngleK4=sol4.theta2_up * 180.0f / M_PI;
 
-    Kp7=Kp_stand;
-    Kd7=Kd_stand;
-    Kp8=Kp_stand;
-    Kd8=Kd_stand;
 
 
 

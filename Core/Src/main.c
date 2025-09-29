@@ -338,6 +338,10 @@ double Kd_H=0.2;
 double Kp_K=1.0;
 double Kd_K=0.2;
 
+// Gait selection
+volatile int gait = 1; // 1: Walk, 2: Trot
+
+volatile int robot_command_state = 0; // 0: Halted/Reset, 1: Running, 2: Paused
 //********************************************************************************
 
 float saturate(float x, float x_min, float x_max) {
@@ -1159,8 +1163,7 @@ LegPositions getLegPositions(double t) {
     double ph_RF = 0.50;
     double ph_LH = 0.75;
 
-    // Gait selection
-    int gait = 1; // 1: Walk, 2: Trot
+
 
     double l1 = 0.3124;
     double l2 = 0.34;
@@ -1195,6 +1198,33 @@ LegPositions getLegPositions(double t) {
 
 void updateControlParameters() {
 	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
+
+
+
+
+
+	switch (robot_command_state) {
+		case 0: // Halted/Reset State
+			HAL_TIM_Base_Stop_IT(&htim2);       // Stop the hardware timer
+			__HAL_TIM_SET_COUNTER(&htim2, 0);   // Reset hardware counter
+			timer_overflows = 0;                // Reset software counter
+			seconds_elapsed = 0.0f;             // Reset final time
+			// You could also command the motors to a "home" position here
+			// For now, we'll just stop everything.
+			return; // Exit the function
+
+		case 2: // Paused State
+			HAL_TIM_Base_Stop_IT(&htim2);       // Stop the timer
+			return; // Exit, freezing the robot in its current position
+
+		case 1: // Running State
+		default:
+			HAL_TIM_Base_Start_IT(&htim2);      // Ensure timer is running
+			break; // Proceed with the rest of the function
+	}
+
+
+
 
 	// Get a temporary copy of the variables to prevent race conditions
 	uint32_t overflows = timer_overflows;

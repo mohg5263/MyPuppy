@@ -1169,7 +1169,7 @@ LegPositions getLegPositions(double t) {
     double l2 = 0.34;
     double initial_height = l1 + l2 - 0.2;
 
-    if (t <= 2.0) {
+    if (t <= 2.0 || gait == 0) {
         // Initial configuration
         all_pos.lf.x = 0.0; all_pos.lf.y = -initial_height;
         all_pos.rh.x = 0.0; all_pos.rh.y = -initial_height;
@@ -1291,7 +1291,7 @@ void updateControlParameters() {
 
 
 
-    signalMotors(rAngle1, rAngle2, rAngle3, rAngle4, rAngle5, rAngle6, rAngle7, rAngle8);
+	signalMotors(rAngle1, rAngle2, rAngle3, rAngle4, rAngle5, rAngle6, rAngle7, rAngle8);
 
 
 

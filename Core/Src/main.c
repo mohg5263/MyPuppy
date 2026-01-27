@@ -326,7 +326,7 @@ float seconds_elapsed = 0;
 
 
 double T = 2.0;
-double beta = 0.75;
+double beta = 0.85;
 double L = 0.20;
 double H = 0.1;
 

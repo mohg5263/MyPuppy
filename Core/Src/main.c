@@ -338,6 +338,9 @@ double Kd_H=0.3;
 double Kp_K=3.0;
 double Kd_K=0.3;
 
+// Define the shifting magnitude
+double BODY_SHIFT_AMP=0.035;
+
 // Gait selection
 volatile int gait = 1; // 1: Walk, 2: Trot
 
@@ -1151,45 +1154,103 @@ typedef struct {
 LegPositions getLegPositions(double t) {
     LegPositions all_pos;
 
-//    // Global gait parameters
-//    double T = 2.0;
-//    double beta = 0.75;
-//    double L = 0.20;
-//    double H = 0.1;
 
-    // Phase offsets
-    double ph_LF = 0.00;
-    double ph_RH = 0.25;
-    double ph_RF = 0.50;
-    double ph_LH = 0.75;
+	// Fixed Parameters
+	double l1 = 0.3124;
+	double l2 = 0.34;
+	double initial_height = l1 + l2 - 0.2;
+
+	// Phase offsets
+	double ph_LF = 0.00;
+	double ph_RH = 0.25;
+	double ph_RF = 0.50;
+	double ph_LH = 0.75;
+
+
+	// 1. Check for Home/Reset State
+	if (t <= 2.0 || gait == 0) {
+		all_pos.lf.x = 0.0; all_pos.lf.y = -initial_height;
+		all_pos.rh.x = 0.0; all_pos.rh.y = -initial_height;
+		all_pos.rf.x = 0.0; all_pos.rf.y = -initial_height;
+		all_pos.lh.x = 0.0; all_pos.lh.y = -initial_height;
+		return all_pos;
+	}
 
 
 
-    double l1 = 0.3124;
-    double l2 = 0.34;
-    double initial_height = l1 + l2 - 0.2;
+	// 2. Calculate Raw Leg Positions (Local Trajectories)
+	// Note: We compute these first, then apply the body shift to them.
+	if (gait == 1) { // Walk
+		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
+		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RH);
+		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
+		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH);
+	} else if (gait == 2) { // Trot
+		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
+		all_pos.rh = leg_xy(t, T, beta, L, H, ph_LF);
+		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
+		all_pos.lh = leg_xy(t, T, beta, L, H, ph_RF);
+	}
 
-    if (t <= 2.0 || gait == 0) {
-        // Initial configuration
-        all_pos.lf.x = 0.0; all_pos.lf.y = -initial_height;
-        all_pos.rh.x = 0.0; all_pos.rh.y = -initial_height;
-        all_pos.rf.x = 0.0; all_pos.rf.y = -initial_height;
-        all_pos.lh.x = 0.0; all_pos.lh.y = -initial_height;
-    } else {
-        if (gait == 1) { // Walk
-            all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
-            all_pos.rh = leg_xy(t, T, beta, L, H, ph_RH);
-            all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
-            all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH);
-        } else if (gait == 2) { // Trot
-            all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
-            all_pos.rh = leg_xy(t, T, beta, L, H, ph_LF); // Same phase as LF
-            all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
-            all_pos.lh = leg_xy(t, T, beta, L, H, ph_RF); // Same phase as RF
-        }
-    }
 
-    return all_pos;
+
+	// 3. Calculate Body Shift (Stability Compensation)
+	// We only apply this in the Walk gait (Gait 1) where static stability is key.
+	if (gait == 1) {
+		double shift_x = 0.0;
+		double swing_duration = (1.0 - beta) * T;
+
+		// Check which leg is swinging to determine shift direction
+		// Helper lambda or macro could be used, but we'll do it explicitly for clarity.
+
+		// --- Check LF Swing (Front) ---
+		double t_lf = fmod(t - ph_LF * T, T);
+		if(t_lf < 0) t_lf += T;
+		if (t_lf >= beta * T) {
+			// LF is swinging. Shift Body BACKWARDS (negative X)
+			double tau = (t_lf - beta * T) / swing_duration;
+			shift_x = -BODY_SHIFT_AMP * sin(M_PI * tau);
+		}
+
+		// --- Check RF Swing (Front) ---
+		double t_rf = fmod(t - ph_RF * T, T);
+		if(t_rf < 0) t_rf += T;
+		if (t_rf >= beta * T) {
+			// RF is swinging. Shift Body BACKWARDS (negative X)
+			double tau = (t_rf - beta * T) / swing_duration;
+			shift_x = -BODY_SHIFT_AMP * sin(M_PI * tau);
+		}
+
+		// --- Check LH Swing (Hind) ---
+		double t_lh = fmod(t - ph_LH * T, T);
+		if(t_lh < 0) t_lh += T;
+		if (t_lh >= beta * T) {
+			// LH is swinging. Shift Body FORWARD (positive X)
+			double tau = (t_lh - beta * T) / swing_duration;
+			shift_x = BODY_SHIFT_AMP * sin(M_PI * tau);
+		}
+
+		// --- Check RH Swing (Hind) ---
+		double t_rh = fmod(t - ph_RH * T, T);
+		if(t_rh < 0) t_rh += T;
+		if (t_rh >= beta * T) {
+			// RH is swinging. Shift Body FORWARD (positive X)
+			double tau = (t_rh - beta * T) / swing_duration;
+			shift_x = BODY_SHIFT_AMP * sin(M_PI * tau);
+		}
+
+		// 4. Apply Shift to All Legs
+		// Moving Body Forward (+X) means moving Feet Backward (-X) relative to body.
+		// Moving Body Backward (-X) means moving Feet Forward (+X) relative to body.
+		// Therefore: foot_new = foot_old - shift_body
+
+		all_pos.lf.x -= shift_x;
+		all_pos.rh.x -= shift_x;
+		all_pos.rf.x -= shift_x;
+		all_pos.lh.x -= shift_x;
+	}
+
+	return all_pos;
 }
 
 

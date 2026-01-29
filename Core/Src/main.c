@@ -327,16 +327,16 @@ float seconds_elapsed = 0;
 
 double T = 2.0;
 double beta = 0.85;
-double L = 0.20;
+double L = 0.15;
 double H = 0.1;
 
 
 
-double Kp_H=1.0;
-double Kd_H=0.2;
+double Kp_H=3.0;
+double Kd_H=0.3;
 
-double Kp_K=1.0;
-double Kd_K=0.2;
+double Kp_K=3.0;
+double Kd_K=0.3;
 
 // Gait selection
 volatile int gait = 1; // 1: Walk, 2: Trot

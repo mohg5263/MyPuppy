@@ -332,10 +332,10 @@ double H = 0.1;
 
 
 
-double Kp_H=3.0;
+double Kp_H=1.0;
 double Kd_H=0.3;
 
-double Kp_K=3.0;
+double Kp_K=1.0;
 double Kd_K=0.3;
 
 // Define the shifting magnitude
@@ -1204,12 +1204,14 @@ LegPositions getLegPositions(double t) {
 		// Helper lambda or macro could be used, but we'll do it explicitly for clarity.
 
 		// --- Check LF Swing (Front) ---
+		// What time is it for this specific leg?
 		double t_lf = fmod(t - ph_LF * T, T);
 		if(t_lf < 0) t_lf += T;
-		if (t_lf >= beta * T) {
+
+		if (t_lf >= beta * T) { //Is the leg in the air?
 			// LF is swinging. Shift Body BACKWARDS (negative X)
-			double tau = (t_lf - beta * T) / swing_duration;
-			shift_x = -BODY_SHIFT_AMP * sin(M_PI * tau);
+			double tau = (t_lf - beta * T) / swing_duration; //How far through the swing are we?
+			shift_x = -BODY_SHIFT_AMP * sin(M_PI * tau); //Generate the Smooth Shift
 		}
 
 		// --- Check RF Swing (Front) ---
@@ -1310,21 +1312,22 @@ void updateControlParameters() {
 
 
 
-    IKResult sol1 = IK(xyCoords.lh.x , xyCoords.lh.y , -130,50);
+    IKResult sol1 = IK(xyCoords.rf.x , xyCoords.rf.y , -130,50);
 
     AngleH1=sol1.theta1_up * 180.0f / M_PI;
     AngleK1=sol1.theta2_up * 180.0f / M_PI;
 
 
-    IKResult sol2 = IK(-xyCoords.rh.x, xyCoords.rh.y, -50, 130);
+    IKResult sol2 = IK(-xyCoords.lf.x, xyCoords.lf.y, -50, 130);
 
     AngleH2=sol2.theta1_down * 180.0f / M_PI;
     AngleK2=sol2.theta2_down * 180.0f / M_PI;
 
 
 
+
     // **Limb 3 Control
-    IKResult sol3 = IK(xyCoords.lf.x, xyCoords.lf.y, -50, 130);
+    IKResult sol3 = IK(xyCoords.rh.x, xyCoords.rh.y, -50, 130);
 
     AngleH3=sol3.theta1_down * 180.0f / M_PI;
     AngleK3=sol3.theta2_down * 180.0f / M_PI;
@@ -1333,7 +1336,7 @@ void updateControlParameters() {
     // **Limb 4 Control
 
 
-    IKResult sol4 = IK(-xyCoords.rf.x, xyCoords.rf.y, -130, 50);
+    IKResult sol4 = IK(-xyCoords.lh.x, xyCoords.lh.y, -130, 50);
 
     AngleH4=sol4.theta1_up * 180.0f / M_PI;
     AngleK4=sol4.theta2_up * 180.0f / M_PI;

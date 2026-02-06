@@ -328,18 +328,18 @@ float seconds_elapsed = 0;
 double T = 2.0;
 double beta = 0.85;
 double L = 0.15;
-double H = 0.1;
+double H = 0.2;
 
 
 
-double Kp_H=1.0;
+double Kp_H=3.0;
 double Kd_H=0.3;
 
-double Kp_K=1.0;
+double Kp_K=3.0;
 double Kd_K=0.3;
 
 // Define the shifting magnitude
-double BODY_SHIFT_AMP=0.035;
+double BODY_SHIFT_AMP=0.0;
 
 // Gait selection
 volatile int gait = 1; // 1: Walk, 2: Trot
@@ -1134,7 +1134,11 @@ LegPosition leg_xy(double t, double T, double beta, double L, double H, double p
         // Swing phase
         double tau = (local_t - beta * T) / ((1 - beta) * T);
         pos.x = -L / 2.0 - v * tau + 3.0 * (L + v) * pow(tau, 2) - 2.0 * (L + v) * pow(tau, 3);
-        pos.y = -height + H * (1.0 - cos(2.0 * M_PI * tau));
+        // NEW CODE: Sine-Squared Curve
+		// - Ranges exactly from 0 to H (not 2H)
+		// - Starts and ends with 0 velocity
+		// - Acceleration is smoother than the cosine hump
+		pos.y = -height + H * pow(sin(M_PI * tau), 2);
     }
     return pos;
 }

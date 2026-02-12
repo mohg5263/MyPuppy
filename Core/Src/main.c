@@ -314,8 +314,8 @@ float ttime2 = 0;
 
 
 // Global constants for link lengths
-const float l1 = 14.50 * 0.0254;
-const float l2 = 13.50 * 0.0254;
+const float l1 = 0.36;
+const float l2 = 0.35;
 
 
 
@@ -332,19 +332,29 @@ double H = 0.2;
 
 
 
-double Kp_H=3.0;
+double Kp_H=4.0;
 double Kd_H=0.3;
 
-double Kp_K=3.0;
+double Kp_K=4.0;
 double Kd_K=0.3;
 
 // Define the shifting magnitude
 double BODY_SHIFT_AMP=0.0;
 
 // Gait selection
-volatile int gait = 1; // 1: Walk, 2: Trot
+volatile int gait = 1; // 1: Walk, 2: Trot, Squat: 3
 
 volatile int robot_command_state = 0; // 0: Halted/Reset, 1: Running, 2: Paused
+
+
+
+// Squat parameters
+volatile double lift_period = 3;  //Squat Lift Period
+volatile double h_crouch = 0.20;    // 20cm (Dormant/Loading height)
+volatile double h_stand  = 0.6;    // 45cm (Max Standing height)home position
+
+
+
 //********************************************************************************
 
 float saturate(float x, float x_min, float x_max) {
@@ -1194,6 +1204,35 @@ LegPositions getLegPositions(double t) {
 		all_pos.rh = leg_xy(t, T, beta, L, H, ph_LF);
 		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
 		all_pos.lh = leg_xy(t, T, beta, L, H, ph_RF);
+	} else if (gait == 3) { //  Heavy Lift Squat Test
+
+		// --- SATURATION LOGIC ---
+		// Define physical limits based on leg lengths (l1+l2 = ~0.65m)
+		// We use 0.60m to keep a safety margin from the singularity.
+		double h_min_limit = 0.15;
+		double h_max_limit = 0.60;
+
+		// Apply saturation using fmin/fmax (standard math.h functions)
+		// This ensures the variables stay within [h_min_limit, h_max_limit]
+		h_crouch = fmax(h_min_limit, fmin(h_crouch, h_max_limit));
+		h_stand  = fmax(h_min_limit, fmin(h_stand, h_max_limit));
+		// ------------------------
+
+	    // Calculate current target height using a Cosine wave
+	    // At t=0, cos(0)=1 -> Height = avg + amp = h_stand (Fully Standing)
+	    // At t=5, cos(pi)=-1 -> Height = avg - amp = h_crouch (Starts Low)
+
+	    double amp = (h_stand - h_crouch) / 2.0;
+	    double avg = (h_stand + h_crouch) / 2.0;
+	    double phase = 2.0 * M_PI * (t / lift_period);
+
+	    double current_h = avg + amp * cos(phase);
+
+	    // Command all 4 legs to this height (Feet stay at x=0 relative to hip)
+	    all_pos.lf.x = 0.0; all_pos.lf.y = -current_h;
+	    all_pos.rh.x = 0.0; all_pos.rh.y = -current_h;
+	    all_pos.rf.x = 0.0; all_pos.rf.y = -current_h;
+	    all_pos.lh.x = 0.0; all_pos.lh.y = -current_h;
 	}
 
 

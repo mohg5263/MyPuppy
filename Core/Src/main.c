@@ -896,26 +896,26 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
         // Convert and update the correct global variable based on the motor's ID
         switch (id) {
             case 1:
-        		position_1 = p * 180.0 / M_PI / 65 * 12;
+        		position_1 = p * 180.0 / M_PI / 80 * 15;
         		velocity_1 = v;
         		torque_1 = i;
         		temp_1 = T - 40;
 
                 break;
             case 2:
-        		position_2 = -p * 180.0 / M_PI / 65 * 12;
+        		position_2 = -p * 180.0 / M_PI / 80 * 15;
         		velocity_2 = v;
         		torque_2 = i;
         		temp_2 = T - 40;
                 break;
             case 3:
-        		position_3 = p * 180.0 / M_PI / 65 * 12;
+        		position_3 = p * 180.0 / M_PI / 80 * 15;
         		velocity_3 = v;
         		torque_3 = i;
         		temp_3 = T - 40;
                 break;
             case 4:
-        		position_4 = -p * 180.0 / M_PI / 65 * 12;
+        		position_4 = -p * 180.0 / M_PI / 80 * 15;
         		velocity_4 = v;
         		torque_4 = i;
         		temp_4 = T - 40;
@@ -1387,10 +1387,10 @@ void updateControlParameters() {
 
 
 
-	rAngle1 = AngleH1 * M_PI * 65 / (12 * 180.0);
-	rAngle2 = AngleK1 * M_PI * 65 / (12 * 180.0);
-	rAngle3 = AngleH2 * M_PI * 65 / (12 * 180.0);
-	rAngle4 = AngleK2 * M_PI * 65 / (12 * 180.0);
+	rAngle1 = AngleH1 * M_PI * 80 / (15 * 180.0);
+	rAngle2 = AngleK1 * M_PI * 80 / (15 * 180.0);
+	rAngle3 = AngleH2 * M_PI * 80 / (15 * 180.0);
+	rAngle4 = AngleK2 * M_PI * 80 / (15 * 180.0);
 	rAngle5 = AngleH3 * M_PI * 65 / (12 * 180.0);
 	rAngle6 = AngleK3 * M_PI * 65 / (12 * 180.0);
 	rAngle7 = AngleH4 * M_PI * 65 / (12 * 180.0);

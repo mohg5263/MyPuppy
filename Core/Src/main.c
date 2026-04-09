@@ -1170,8 +1170,6 @@ LegPositions getLegPositions(double t) {
 
 
 	// Fixed Parameters
-	double l1 = 0.3124;
-	double l2 = 0.34;
 	double initial_height = l1 + l2 - 0.2;
 
 	// Phase offsets

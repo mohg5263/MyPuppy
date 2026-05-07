@@ -21,9 +21,6 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "spi.h"
-#include "tim.h"
-#include "usart.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -57,12 +54,10 @@ volatile char uart_msg_buffer[50];
 /* Private variables ---------------------------------------------------------*/
 CAN_HandleTypeDef hcan1;
 
-//SPI_HandleTypeDef hspi1;
-//
-//TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim6;
 
-//UART_HandleTypeDef huart2;
+UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 // limit data to be within bounds (specific to the AK80-9 motor)
@@ -84,11 +79,10 @@ TIM_HandleTypeDef htim6;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-//static void MX_USART2_UART_Init(void);
+static void MX_USART2_UART_Init(void);
 static void MX_CAN1_Init(void);
 static void MX_TIM6_Init(void);
-//static void MX_TIM2_Init(void);
-//static void MX_SPI1_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 void CAN1_Tx_motor_on(int);
 void CAN1_Tx_motor_zero(int);
@@ -322,7 +316,7 @@ float ttime2 = 0;
 // Global constants for link lengths
 const float l1 = 0.36;
 const float l2 = 0.35;
-
+double initial_height = l1 + l2 - 0.2;
 
 
 uint32_t init_tick;
@@ -331,10 +325,10 @@ volatile uint32_t timer_overflows = 0;
 float seconds_elapsed = 0;
 
 
-double T = 2.0;
-double beta = 0.85;
-double L = 0.15;
-double H = 0.2;
+double T = 1.0;
+double beta = 0.65;
+double L = 0.2;
+double H = 0.15;
 
 
 
@@ -417,7 +411,6 @@ int main(void)
 
   /* USER CODE BEGIN SysInit */
 
-
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -426,9 +419,6 @@ int main(void)
   MX_CAN1_Init();
   MX_TIM6_Init();
   MX_TIM2_Init();
-  MX_SPI1_Init();
-
-
   /* USER CODE BEGIN 2 */
 	if (HAL_CAN_Start(&hcan1) != HAL_OK) //CAN is started and checked for error.
 			{
@@ -590,17 +580,50 @@ static void MX_CAN1_Init(void)
 }
 
 /**
-  * @brief SPI1 Initialization Function
-  * @param None
-  * @retval None
-  */
-
-/**
   * @brief TIM2 Initialization Function
   * @param None
   * @retval None
   */
+static void MX_TIM2_Init(void)
+{
 
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 80-1;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 65535;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+  __HAL_TIM_ENABLE_IT(&htim2, TIM_IT_UPDATE);
+
+  /* USER CODE END TIM2_Init 2 */
+
+}
 
 /**
   * @brief TIM6 Initialization Function
@@ -622,7 +645,7 @@ static void MX_TIM6_Init(void)
   htim6.Instance = TIM6;
   htim6.Init.Prescaler = 4-1;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 50000-1;
+  htim6.Init.Period = 100000-1;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
   {
@@ -645,6 +668,35 @@ static void MX_TIM6_Init(void)
   * @param None
   * @retval None
   */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 921600;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_RTS_CTS;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_8;
+  huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+
+}
 
 /**
   * @brief GPIO Initialization Function
@@ -664,10 +716,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, IMU0_RST_Pin|IMU0_P1_Pin|IMU0_P0_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, IMU0_BT_Pin|IMU0_CS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_6, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -675,30 +724,14 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : IMU0_RST_Pin IMU0_P1_Pin IMU0_P0_Pin */
-  GPIO_InitStruct.Pin = IMU0_RST_Pin|IMU0_P1_Pin|IMU0_P0_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : IMU0_BT_Pin IMU0_CS_Pin */
-  GPIO_InitStruct.Pin = IMU0_BT_Pin|IMU0_CS_Pin;
+  /*Configure GPIO pins : LD2_Pin PA6 */
+  GPIO_InitStruct.Pin = LD2_Pin|GPIO_PIN_6;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : IMU0_INT_Pin */
-  GPIO_InitStruct.Pin = IMU0_INT_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(IMU0_INT_GPIO_Port, &GPIO_InitStruct);
-
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
@@ -1090,7 +1123,7 @@ typedef struct {
 LegPosition leg_xy(double t, double T, double beta, double L, double H, double phaseFrac) {
     LegPosition pos;
 
-    double height = l1 + l2 - 0.2;
+
 
     double offset = phaseFrac * T;
     double local_t = fmod(t - offset, T);
@@ -1104,7 +1137,7 @@ LegPosition leg_xy(double t, double T, double beta, double L, double H, double p
     if (local_t < beta * T) {
         // Stance phase
         pos.x = L / 2.0 - v * local_t;
-        pos.y = -height;
+        pos.y = -initial_height;
     } else {
         // Swing phase
         double tau = (local_t - beta * T) / ((1 - beta) * T);
@@ -1113,7 +1146,7 @@ LegPosition leg_xy(double t, double T, double beta, double L, double H, double p
 		// - Ranges exactly from 0 to H (not 2H)
 		// - Starts and ends with 0 velocity
 		// - Acceleration is smoother than the cosine hump
-		pos.y = -height + H * pow(sin(M_PI * tau), 2);
+		pos.y = -initial_height + H * pow(sin(M_PI * tau), 2);
     }
     return pos;
 }
@@ -1135,7 +1168,7 @@ LegPositions getLegPositions(double t) {
 
 
 	// Fixed Parameters
-	double initial_height = l1 + l2 - 0.2;
+//	double initial_height = l1 + l2 - 0.2;
 
 	// Phase offsets
 	double ph_LF = 0.00;
@@ -1169,10 +1202,10 @@ LegPositions getLegPositions(double t) {
 	} else if (gait == 3) { //  Heavy Lift Squat Test
 
 		// --- SATURATION LOGIC ---
-		// Define physical limits based on leg lengths (l1+l2 = ~0.65m)
+		// Define physical limits based on leg lengths (l1+l2 = 0.71m)
 		// We use 0.60m to keep a safety margin from the singularity.
-		double h_min_limit = 0.15;
-		double h_max_limit = 0.60;
+		double h_min_limit = 0.10;
+		double h_max_limit = 0.70;
 
 		// Apply saturation using fmin/fmax (standard math.h functions)
 		// This ensures the variables stay within [h_min_limit, h_max_limit]

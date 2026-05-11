@@ -332,10 +332,10 @@ double H = 0.15;
 
 
 
-double Kp_H=1.0;
+double Kp_H=4.0;
 double Kd_H=0.3;
 
-double Kp_K=1.0;
+double Kp_K=4.0;
 double Kd_K=0.3;
 
 
@@ -894,50 +894,50 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
         // Convert and update the correct global variable based on the motor's ID
         switch (id) {
             case 1:
-        		position_1 = p * 180.0 / M_PI / 80 * 15 + 43.0;
+        		position_1 = p * 180.0 / M_PI / 80 * 15 + 22;
         		velocity_1 = v;
         		torque_1 = i;
         		temp_1 = T - 40;
 
                 break;
             case 2:
-        		position_2 = -p * 180.0 / M_PI / 80 * 15 - 88.0;
+        		position_2 = -p * 180.0 / M_PI / 80 * 15 - 122;
         		velocity_2 = v;
         		torque_2 = i;
         		temp_2 = T - 40;
                 break;
             case 3:
-        		position_3 = p * 180.0 / M_PI / 80 * 15 - 43.0;
+        		position_3 = p * 180.0 / M_PI / 80 * 15 - 22;
         		velocity_3 = v;
         		torque_3 = i;
         		temp_3 = T - 40;
                 break;
             case 4:
-        		position_4 = -p * 180.0 / M_PI / 80 * 15 + 88.0;
+        		position_4 = -p * 180.0 / M_PI / 80 * 15 + 122;
         		velocity_4 = v;
         		torque_4 = i;
         		temp_4 = T - 40;
                 break;
             case 5:
-        		position_5 = p * 180.0 / M_PI / 65 * 12 - 43.0;
+        		position_5 = p * 180.0 / M_PI / 65 * 12 - 36;
         		velocity_5 = v;
         		torque_5 = i;
         		temp_5 = T - 40;
                 break;
             case 6:
-        		position_6 = -p * 180.0 / M_PI / 65 * 12 + 88.0;
+        		position_6 = -p * 180.0 / M_PI / 65 * 12 + 125;
         		velocity_6 = v;
         		torque_6 = i;
         		temp_6 = T - 40;
                 break;
             case 7:
-        		position_7 = p * 180.0 / M_PI / 65 * 12 + 43.0;
+        		position_7 = p * 180.0 / M_PI / 65 * 12 + 36;
         		velocity_7 = v;
         		torque_7 = i;
         		temp_7 = T - 40;
                 break;
             case 8:
-        		position_8 = -p * 180.0 / M_PI / 65 * 12 - 88.0;
+        		position_8 = -p * 180.0 / M_PI / 65 * 12 - 125;
         		velocity_8 = v;
         		torque_8 = i;
         		temp_8 = T - 40;
@@ -1186,6 +1186,17 @@ LegPositions getLegPositions(double t) {
 		return all_pos;
 	}
 
+	if (gait == 4) {
+		// Front legs (Targets 22 deg, 122 deg) -> X = -0.210m, Y = -0.273m
+		all_pos.lf.x = -0.210; all_pos.lf.y = -0.273;
+		all_pos.rf.x = -0.210; all_pos.rf.y = -0.273;
+
+		// Back legs (Targets 36 deg, 125 deg) -> X = 0.138m, Y = -0.297m
+		all_pos.lh.x =  0.138; all_pos.lh.y = -0.297;
+		all_pos.rh.x =  0.138; all_pos.rh.y = -0.297;
+		return all_pos;
+	}
+
 
 
 	// 2. Calculate Raw Leg Positions (Local Trajectories)
@@ -1293,14 +1304,14 @@ void updateControlParameters() {
 
     IKResult sol1 = IK(xyCoords.rf.x , xyCoords.rf.y , -130,50);
 
-    AngleH1=sol1.theta1_up * 180.0f / M_PI - 43.0f;
-    AngleK1=sol1.theta2_up * 180.0f / M_PI + 88.0f;
+    AngleH1=sol1.theta1_up * 180.0f / M_PI - 22.0f;
+    AngleK1=sol1.theta2_up * 180.0f / M_PI + 122.0f;
 
 
     IKResult sol2 = IK(-xyCoords.lf.x, xyCoords.lf.y, -50, 130);
 
-    AngleH2=sol2.theta1_down * 180.0f / M_PI + 43.0f;
-    AngleK2=sol2.theta2_down * 180.0f / M_PI - 88.0f;
+    AngleH2=sol2.theta1_down * 180.0f / M_PI + 22.0f;
+    AngleK2=sol2.theta2_down * 180.0f / M_PI - 122.0f;
 
 
 
@@ -1308,8 +1319,8 @@ void updateControlParameters() {
     // **Limb 3 Control
     IKResult sol3 = IK(xyCoords.rh.x, xyCoords.rh.y, -50, 130);
 
-    AngleH3=sol3.theta1_down * 180.0f / M_PI + 43.0f;
-    AngleK3=sol3.theta2_down * 180.0f / M_PI - 88.0f;
+    AngleH3=sol3.theta1_down * 180.0f / M_PI + 36.0f;
+    AngleK3=sol3.theta2_down * 180.0f / M_PI - 125.0f;
 
 
     // **Limb 4 Control
@@ -1317,8 +1328,8 @@ void updateControlParameters() {
 
     IKResult sol4 = IK(-xyCoords.lh.x, xyCoords.lh.y, -130, 50);
 
-    AngleH4=sol4.theta1_up * 180.0f / M_PI - 43.0f;
-    AngleK4=sol4.theta2_up * 180.0f / M_PI + 88.0f;
+    AngleH4=sol4.theta1_up * 180.0f / M_PI - 36.0f;
+    AngleK4=sol4.theta2_up * 180.0f / M_PI + 125.0f;
 
 
 

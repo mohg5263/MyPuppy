@@ -31,6 +31,16 @@
 #include <stdbool.h>
 
 
+
+/* SHTP & BNO085 Includes */
+#include "sh2.h"
+#include "sh2_util.h"
+#include "euler.h"
+#include "sh2_err.h"
+#include "sh2_SensorValue.h"
+#include "sh2_hal.h"
+
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,6 +67,7 @@ CAN_HandleTypeDef hcan1;
 SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim6;
 
 UART_HandleTypeDef huart2;
@@ -76,6 +87,28 @@ UART_HandleTypeDef huart2;
 
 
 
+#define RESET_DELAY_US (10000)
+#define START_DELAY_US (2000000)
+#define DFU_BOOT_DELAY_US (50000)
+#define DFU_CS_TIMING_US (20)
+#define DFU_BYTE_TIMING_US (28)
+#define DFU_CS_DEASSERT_DELAY_RX_US (0)
+#define DFU_CS_DEASSERT_DELAY_TX_US (5000)
+#define READ_LEN (4)
+
+/* ==============================================================================
+   PRIVATE ENUMS & TYPEDEFS
+   ============================================================================== */
+typedef enum SpiState_e {
+    SPI_INIT,
+    SPI_DUMMY,
+    SPI_DFU,
+    SPI_IDLE,
+    SPI_RD_HDR,
+    SPI_RD_BODY,
+    SPI_WRITE
+} SpiState_t;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -86,6 +119,7 @@ static void MX_CAN1_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 void CAN1_Tx_motor_on(int);
 void CAN1_Tx_motor_zero(int);
@@ -100,6 +134,13 @@ void Stop_Motors(int, int, int, int, int, int, int, int);
 void updateControlParameters();
 void updateRamp(int motorIdx); // NEW: Prototype for updateRamp function
 
+/* SPI HAL Prototypes */
+sh2_Hal_t *sh2_hal_init(void);
+sh2_Hal_t *dfu_hal_init(void);
+static void spiActivate(void);
+static void spiCompleted(void);
+static uint32_t timeNowUs(void);
+
 
 
 // Prototype of the template function
@@ -108,6 +149,33 @@ void updateRamp(int motorIdx); // NEW: Prototype for updateRamp function
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+/* SH2 Sensor Logic Variables */
+float r, i, j, k, acc_deg, x, y, z;
+sh2_ProductIds_t prodIds;
+sh2_Hal_t *pSh2Hal = 0;
+bool resetOccurred = false;
+
+/* SPI HAL State Variables */
+static const uint8_t txZeros[SH2_HAL_MAX_TRANSFER_IN] = {0};
+static SpiState_t spiState = SPI_INIT;
+static volatile uint32_t rxTimestamp_us;
+static volatile bool inReset;
+static volatile bool rxReady;
+
+/* SPI HAL Buffers */
+static uint8_t rxBuf[SH2_HAL_MAX_TRANSFER_IN];
+static volatile uint32_t rxBufLen;
+static volatile bool rxDataReady;
+static uint8_t txBuf[SH2_HAL_MAX_TRANSFER_OUT];
+static uint32_t txBufLen;
+
+/* SPI HAL Instances */
+static sh2_Hal_t sh2Hal;
+static sh2_Hal_t dfuHal;
+static bool isOpen = false;
+
+
+
 CAN_TxHeaderTypeDef TxHeader;
 CAN_RxHeaderTypeDef RxHeader;
 
@@ -387,6 +455,83 @@ float uint_to_float(int x_int, float x_min, float x_max, int bits) {
 
 
 
+
+
+
+/* ==============================================================================
+   SH2 APP LOGIC (Start Reports, Handlers, Callbacks)
+   ============================================================================== */
+static void startReports() {
+    int status;
+    static const struct {
+        int sensorId;
+        sh2_SensorConfig_t config;
+    } sensorConfig[] = {
+        // Game Rotation Vector, 100Hz
+        {SH2_GAME_ROTATION_VECTOR, {.reportInterval_us = 10000}}
+    };
+
+    for (int n = 0; n < ARRAY_LEN(sensorConfig); n++) {
+        int sensorId = sensorConfig[n].sensorId;
+        status = sh2_setSensorConfig(sensorId, &sensorConfig[n].config);
+        if (status != 0) {
+            printf("Error while enabling sensor %d\n", sensorId);
+        }
+    }
+}
+
+static void eventHandler(void * cookie, sh2_AsyncEvent_t *pEvent) {
+    if (pEvent->eventId == SH2_RESET) {
+        resetOccurred = true;
+    } else if (pEvent->eventId == SH2_SHTP_EVENT) {
+        printf("EventHandler  id:SHTP, %d\n", pEvent->shtpEvent);
+    } else if (pEvent->eventId == SH2_GET_FEATURE_RESP) {
+        // Handled silently
+    } else {
+        printf("EventHandler, unknown event Id: %d\n", pEvent->eventId);
+    }
+}
+
+static void printEvent(void * cookie, sh2_SensorEvent_t * event) {
+    int rc;
+    sh2_SensorValue_t value;
+    float scaleRadToDeg = 180.0 / 3.14159265358;
+    float t;
+    static int skip = 0;
+
+    rc = sh2_decodeSensorEvent(&value, event);
+    if (rc != SH2_OK) {
+        printf("Error decoding sensor event: %d\n\r", rc);
+        return;
+    }
+
+    t = value.timestamp / 1000000.0;  // time in seconds.
+
+    switch (value.sensorId) {
+        case SH2_ACCELEROMETER:
+            printf("%8.4f Acceleration| X: %6.2f | Y: %6.2f | Z: %6.2f\n\r",
+                   (double)t, (double)value.un.accelerometer.x,
+                   (double)value.un.accelerometer.y, (double)value.un.accelerometer.z);
+            break;
+        case SH2_GAME_ROTATION_VECTOR:
+            r = value.un.gameRotationVector.real; // W
+            i = value.un.gameRotationVector.i;    // X
+            j = value.un.gameRotationVector.j;    // Y
+            k = value.un.gameRotationVector.k;    // Z
+
+            float yaw_deg = atan2f(2.0f * (i * j + k * r), i * i - j * j - k * k + r * r) * scaleRadToDeg;
+            float pitch_deg = asinf(-2.0f * (i * k - j * r)) * scaleRadToDeg;
+            float roll_deg = atan2f(2.0f * (j * k + i * r), -i * i - j * j + k * k + r * r) * scaleRadToDeg;
+            printf("%8.4f Orientation | Roll: %6.2f | Pitch: %6.2f | Yaw: %6.2f\n\r",
+                   (double)t, (double)roll_deg, (double)pitch_deg, (double)yaw_deg);
+            break;
+        default:
+            // Handled other sensors silently to save space
+            break;
+    }
+}
+
+
 /* USER CODE END 0 */
 
 /**
@@ -397,6 +542,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+  int status;
 
   /* USER CODE END 1 */
 
@@ -423,6 +569,7 @@ int main(void)
   MX_TIM6_Init();
   MX_TIM2_Init();
   MX_SPI1_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 	if (HAL_CAN_Start(&hcan1) != HAL_OK) //CAN is started and checked for error.
 			{
@@ -451,7 +598,16 @@ int main(void)
 
 
 
+    /* Create HAL instance and Open SH2 interface */
+    pSh2Hal = sh2_hal_init();
+    status = sh2_open(pSh2Hal, eventHandler, NULL);
+    if (status != SH2_OK) {
+        printf("Error, %d, from sh2_open.\n", status);
+    }
 
+    sh2_setSensorCallback(printEvent, NULL);
+    startReports();
+    printf("Hello World! The UART is working!\r\n");
 
   /* USER CODE END 2 */
 
@@ -470,8 +626,15 @@ int main(void)
 	      update_control_params = 0;
 	  }
 
-
+      if (resetOccurred) {
+          resetOccurred = false;
+          startReports();
+      }
+      sh2_service();
   }
+
+
+
   /* USER CODE END 3 */
 }
 
@@ -670,6 +833,51 @@ static void MX_TIM2_Init(void)
 }
 
 /**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 79;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 65535;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
   * @brief TIM6 Initialization Function
   * @param None
   * @retval None
@@ -787,11 +995,14 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : IMU0_INT_Pin */
   GPIO_InitStruct.Pin = IMU0_INT_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(IMU0_INT_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
@@ -931,6 +1142,27 @@ void CAN1_Tx_send_to_motor(int motor_id, float pos, float vel, float kp,
 		Error_Handler();
 	}
 }
+
+/* ==============================================================================
+   INTERRUPT CALLBACKS (Moved from spi_hal.c & main.c)
+   ============================================================================== */
+void HAL_GPIO_EXTI_Callback(uint16_t n) {
+	if (n == IMU0_INT_Pin) {
+		rxTimestamp_us = timeNowUs();
+		inReset = false;
+		rxReady = true;
+		spiActivate();
+	}
+}
+
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef * hspi1) {
+    if (isOpen) spiCompleted();
+}
+
+void HAL_SPI_ErrorCallback(SPI_HandleTypeDef * hspi1) {
+    while (1); // Trap on SPI error
+}
+
 
 
 // New CAN receive callback function
@@ -1451,6 +1683,199 @@ void Stop_Motors(int motor1, int motor2, int motor3, int motor4, int motor5, int
 	}
 }
 
+
+
+
+
+/* ==============================================================================
+   SPI HAL IMPLEMENTATION (Integrated from spi_hal.c)
+   ============================================================================== */
+static void bootn(bool state) { HAL_GPIO_WritePin(IMU0_BT_GPIO_Port, IMU0_BT_Pin, state ? GPIO_PIN_SET : GPIO_PIN_RESET); }
+static void rstn(bool state) { HAL_GPIO_WritePin(IMU0_RST_GPIO_Port, IMU0_RST_Pin, state ? GPIO_PIN_SET : GPIO_PIN_RESET); }
+static void ps0_waken(bool state) { HAL_GPIO_WritePin(IMU0_P0_GPIO_Port, IMU0_P0_Pin, state ? GPIO_PIN_SET : GPIO_PIN_RESET); }
+static void ps1(bool state) { HAL_GPIO_WritePin(IMU0_P1_GPIO_Port, IMU0_P1_Pin, state ? GPIO_PIN_SET : GPIO_PIN_RESET); }
+static void csn(bool state) { HAL_GPIO_WritePin(IMU0_CS_GPIO_Port, IMU0_CS_Pin, state ? GPIO_PIN_SET : GPIO_PIN_RESET); }
+static uint32_t timeNowUs(void) {
+    uint32_t overflows = timer_overflows;
+    uint32_t current_tick = __HAL_TIM_GET_COUNTER(&htim2);
+
+    // Catch race conditions if the timer rolls over while we are reading it
+    if (__HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_UPDATE) != RESET) {
+        overflows++;
+    }
+
+    // Return the true continuous microsecond count
+    return (overflows * 65536) + current_tick;
+}
+
+static void enableInts(void) {
+    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+    HAL_NVIC_EnableIRQ(SPI1_IRQn);
+}
+
+static void disableInts() {
+    HAL_NVIC_DisableIRQ(SPI1_IRQn);
+    HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
+}
+
+void delayUs(uint32_t delay) {
+    volatile uint32_t now = timeNowUs();
+    uint32_t start = now;
+    while ((now - start) < delay) { now = timeNowUs(); }
+}
+
+void resetDelayUs(uint32_t delay) {
+    volatile uint32_t now = timeNowUs();
+    uint32_t start = now;
+    while (((now - start) < delay) && (inReset)) { now = timeNowUs(); }
+}
+
+static void spiDummyOp(void) {
+    uint8_t dummyTx[1];
+    uint8_t dummyRx[1];
+    memset(dummyTx, 0xAA, sizeof(dummyTx));
+    HAL_SPI_TransmitReceive(&hspi1, dummyTx, dummyRx, sizeof(dummyTx), 2);
+}
+
+static void spiActivate(void) {
+    if ((spiState == SPI_IDLE) && (rxBufLen == 0)) {
+        if (rxReady) {
+            rxReady = false;
+            csn(false);
+            if (txBufLen > 0) {
+                spiState = SPI_WRITE;
+                HAL_SPI_TransmitReceive_IT(&hspi1, txBuf, rxBuf, txBufLen);
+                ps0_waken(true);
+            } else {
+                spiState = SPI_RD_HDR;
+                HAL_SPI_TransmitReceive_IT(&hspi1, (uint8_t *)txZeros, rxBuf, READ_LEN);
+            }
+        }
+    }
+}
+
+static void spiCompleted(void) {
+    uint16_t rxLen = (rxBuf[0] + (rxBuf[1] << 8)) & ~0x8000;
+    if (rxLen > sizeof(rxBuf)) { rxLen = sizeof(rxBuf); }
+
+    if (spiState == SPI_DUMMY) {
+        spiState = SPI_IDLE;
+    } else if (spiState == SPI_RD_HDR) {
+        if (rxLen > READ_LEN) {
+            spiState = SPI_RD_BODY;
+            HAL_SPI_TransmitReceive_IT(&hspi1, (uint8_t *)txZeros, rxBuf+READ_LEN, rxLen-READ_LEN);
+        } else {
+            csn(true);
+            rxBufLen = 0;
+            spiState = SPI_IDLE;
+            spiActivate();
+        }
+    } else if (spiState == SPI_RD_BODY) {
+        csn(true);
+        rxBufLen = rxLen;
+        spiState = SPI_IDLE;
+        spiActivate();
+    } else if (spiState == SPI_WRITE) {
+        csn(true);
+        rxBufLen = (txBufLen < rxLen) ? txBufLen : rxLen;
+        txBufLen = 0;
+        spiState = SPI_IDLE;
+        spiActivate();
+    }
+}
+
+static int sh2_spi_hal_open(sh2_Hal_t *self) {
+    int retval = SH2_OK;
+    if (isOpen) return SH2_ERR;
+    isOpen = true;
+
+    rstn(false);
+    csn(true);
+    rxBufLen = 0;
+    txBufLen = 0;
+    rxDataReady = false;
+    rxReady = false;
+    inReset = true;
+
+    spiState = SPI_DUMMY;
+    spiDummyOp();
+    spiState = SPI_IDLE;
+
+    delayUs(RESET_DELAY_US);
+    ps0_waken(true);
+    ps1(true);
+
+    bootn(true);
+    rstn(true);
+
+    enableInts();
+    resetDelayUs(START_DELAY_US);
+    return retval;
+}
+
+static void sh2_spi_hal_close(sh2_Hal_t *self) {
+    disableInts();
+    spiState = SPI_INIT;
+    rstn(false);
+    csn(true);
+    HAL_SPI_DeInit(&hspi1);
+    __HAL_TIM_DISABLE(&htim2);
+    isOpen = false;
+}
+
+static int sh2_spi_hal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len, uint32_t *t) {
+    int retval = 0;
+    if (rxBufLen > 0) {
+        if (len >= rxBufLen) {
+            memcpy(pBuffer, rxBuf, rxBufLen);
+            retval = rxBufLen;
+            *t = rxTimestamp_us;
+            rxBufLen = 0;
+        } else {
+            retval = SH2_ERR_BAD_PARAM;
+            rxBufLen = 0;
+        }
+        disableInts();
+        spiActivate();
+        enableInts();
+    }
+    return retval;
+}
+
+static int sh2_spi_hal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len) {
+    int retval = SH2_OK;
+    if ((self == 0) || (len > sizeof(txBuf)) || ((len > 0) && (pBuffer == 0))) { return SH2_ERR_BAD_PARAM; }
+    if (txBufLen != 0) { return 0; }
+
+    memcpy(txBuf, pBuffer, len);
+    txBufLen = len;
+    retval = len;
+
+    disableInts();
+    ps0_waken(false);
+    enableInts();
+
+    return retval;
+}
+
+static uint32_t sh2_spi_hal_getTimeUs(sh2_Hal_t *self) { return timeNowUs(); }
+
+sh2_Hal_t *sh2_hal_init(void) {
+    sh2Hal.open = sh2_spi_hal_open;
+    sh2Hal.close = sh2_spi_hal_close;
+    sh2Hal.read = sh2_spi_hal_read;
+    sh2Hal.write = sh2_spi_hal_write;
+    sh2Hal.getTimeUs = sh2_spi_hal_getTimeUs;
+    return &sh2Hal;
+}
+
+/* ==============================================================================
+   SYSTEM OVERRIDES & ERROR HANDLING
+   ============================================================================== */
+int _write(int file, char *ptr, int len) {
+	HAL_UART_Transmit(&huart2, (uint8_t *)ptr, len, HAL_MAX_DELAY);
+	return len;
+}
 /* USER CODE END 4 */
 
 /**

@@ -1324,12 +1324,12 @@ double AngleK4 = 0;
 
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-	if (htim->Instance == TIM2) {
+	if (htim->Instance == TIM6) {
 		update_control_params = 1;
 		update_button = 1;
+    }if (htim->Instance == TIM2) {
         timer_overflows++;
     }if (htim->Instance == TIM3) {
-        // IMU timer logic
         imu_timer_overflows++;
     }
 }

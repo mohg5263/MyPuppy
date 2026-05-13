@@ -78,7 +78,6 @@ void Error_Handler(void);
 #define SPI1_SCK_GPIO_Port GPIOA
 #define IMU0_INT_Pin GPIO_PIN_8
 #define IMU0_INT_GPIO_Port GPIOA
-#define IMU0_INT_EXTI_IRQn EXTI9_5_IRQn
 #define TMS_Pin GPIO_PIN_13
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14

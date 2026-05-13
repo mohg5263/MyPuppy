@@ -1163,7 +1163,8 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef * hspi1) {
 }
 
 void HAL_SPI_ErrorCallback(SPI_HandleTypeDef * hspi1) {
-    while (1); // Trap on SPI error
+	printf("HAL_SPI_ErrorCallback error occured");
+
 }
 
 

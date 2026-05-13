@@ -1163,7 +1163,19 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef * hspi1) {
 }
 
 void HAL_SPI_ErrorCallback(SPI_HandleTypeDef * hspi1) {
-	printf("HAL_SPI_ErrorCallback error occured");
+	printf("SPI Error Detected! Resetting state machine...\r\n");
+
+	// 1. Abort the broken hardware transaction
+	HAL_SPI_Abort_IT(hspi1);
+
+	// 2. Force the software state machine back to IDLE
+	spiState = SPI_IDLE;
+	rxBufLen = 0;
+	txBufLen = 0;
+	rxReady = false;
+
+	// 3. De-assert Chip Select to reset the IMU's SPI receiver
+	HAL_GPIO_WritePin(IMU0_CS_GPIO_Port, IMU0_CS_Pin, GPIO_PIN_SET);
 
 }
 

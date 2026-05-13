@@ -176,6 +176,7 @@ static bool isOpen = false;
 
 
 
+
 CAN_TxHeaderTypeDef TxHeader;
 CAN_RxHeaderTypeDef RxHeader;
 
@@ -393,6 +394,7 @@ double initial_height = l1 + l2 - 0.2;
 uint32_t init_tick;
 
 volatile uint32_t timer_overflows = 0;
+volatile uint32_t imu_timer_overflows = 0;
 float seconds_elapsed = 0;
 
 
@@ -595,6 +597,7 @@ int main(void)
 	// Start timer
 	HAL_TIM_Base_Start_IT(&htim6);
 	HAL_TIM_Base_Start_IT(&htim2);
+	HAL_TIM_Base_Start_IT(&htim3);
 
 
 
@@ -968,7 +971,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, IMU0_RST_Pin|IMU0_P1_Pin|IMU0_P0_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, IMU0_RST_Pin|IMU0_P1_Pin|IMU0_P0_Pin|GPIO_PIN_4, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, IMU0_BT_Pin|IMU0_CS_Pin, GPIO_PIN_RESET);
@@ -979,8 +982,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : IMU0_RST_Pin IMU0_P1_Pin IMU0_P0_Pin */
-  GPIO_InitStruct.Pin = IMU0_RST_Pin|IMU0_P1_Pin|IMU0_P0_Pin;
+  /*Configure GPIO pins : IMU0_RST_Pin IMU0_P1_Pin IMU0_P0_Pin PC4 */
+  GPIO_InitStruct.Pin = IMU0_RST_Pin|IMU0_P1_Pin|IMU0_P0_Pin|GPIO_PIN_4;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -1321,10 +1324,13 @@ double AngleK4 = 0;
 
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-    update_control_params = 1;
-    update_button = 1;
-    if (htim->Instance == TIM2) {
+	if (htim->Instance == TIM2) {
+		update_control_params = 1;
+		update_button = 1;
         timer_overflows++;
+    }if (htim->Instance == TIM3) {
+        // IMU timer logic
+        imu_timer_overflows++;
     }
 }
 
@@ -1542,7 +1548,7 @@ LegPositions getLegPositions(double t) {
 
 
 void updateControlParameters() {
-	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
+	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_4);
 
 
 
@@ -1641,7 +1647,7 @@ void updateControlParameters() {
 
 
 
-    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
+    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_4);
 }
 
 
@@ -1696,11 +1702,11 @@ static void ps0_waken(bool state) { HAL_GPIO_WritePin(IMU0_P0_GPIO_Port, IMU0_P0
 static void ps1(bool state) { HAL_GPIO_WritePin(IMU0_P1_GPIO_Port, IMU0_P1_Pin, state ? GPIO_PIN_SET : GPIO_PIN_RESET); }
 static void csn(bool state) { HAL_GPIO_WritePin(IMU0_CS_GPIO_Port, IMU0_CS_Pin, state ? GPIO_PIN_SET : GPIO_PIN_RESET); }
 static uint32_t timeNowUs(void) {
-    uint32_t overflows = timer_overflows;
-    uint32_t current_tick = __HAL_TIM_GET_COUNTER(&htim2);
+    uint32_t overflows = imu_timer_overflows;
+    uint32_t current_tick = __HAL_TIM_GET_COUNTER(&htim3); // Read TIM3
 
     // Catch race conditions if the timer rolls over while we are reading it
-    if (__HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_UPDATE) != RESET) {
+    if (__HAL_TIM_GET_FLAG(&htim3, TIM_FLAG_UPDATE) != RESET) {
         overflows++;
     }
 
@@ -1819,7 +1825,7 @@ static void sh2_spi_hal_close(sh2_Hal_t *self) {
     rstn(false);
     csn(true);
     HAL_SPI_DeInit(&hspi1);
-    __HAL_TIM_DISABLE(&htim2);
+    __HAL_TIM_DISABLE(&htim3);
     isOpen = false;
 }
 

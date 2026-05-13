@@ -413,7 +413,7 @@ double Kd_K=0.3;
 
 
 // Gait selection
-volatile int gait = 1; // 1: Walk, 2: Trot, Squat: 3
+volatile int gait = 1; // Stand: 0, 1: Walk, 2: Trot, Squat: 3, Sit:4
 
 volatile int robot_command_state = 0; // 0: Halted/Reset, 1: Running, 2: Paused
 
@@ -1324,9 +1324,10 @@ double AngleK4 = 0;
 
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-	if (htim->Instance == TIM2) {
+	if (htim->Instance == TIM6) {
 		update_control_params = 1;
 		update_button = 1;
+	}if (htim->Instance == TIM2) {
         timer_overflows++;
     }if (htim->Instance == TIM3) {
         // IMU timer logic

@@ -157,7 +157,25 @@ volatile float roll_deg = 0.0f;
 volatile float pitch_deg = 0.0f;
 volatile float yaw_deg = 0.0f;
 
-volatile double K_balance = 1.0;
+// --- Posture PID Control Variables ---
+// Tuning Gains (Start small and tune up!)
+double Kd_bal = 0.0005; // Proportional: Drives error to zero
+double Ki_bal = 0.001; // Integral: Removes steady-state offset (start at 0)
+double Kp_bal = 0.01; // Derivative: Damps the motion
+
+
+double P_pitch =0;
+double I_pitch =0;
+double D_pitch =0;
+
+
+// State Tracking
+double pitch_integral = 0.0, roll_integral = 0.0;
+double pitch_prev_error = 0.0, roll_prev_error = 0.0;
+double last_pid_time = 0.0;
+
+// Output limits to prevent unexpected extreme motions (in meters)
+double MAX_COMPENSATION = 0.1; // Max 10cm adjustment per leg
 
 
 sh2_ProductIds_t prodIds;
@@ -1505,49 +1523,72 @@ LegPositions getLegPositions(double t) {
 		all_pos.lh.x = 0.0; all_pos.lh.y = -initial_height;
 		return all_pos;
 	}
-	if (gait == 5) { // Active Posture Detection / Balancing
 
-			// 1. Define Robot Chassis Dimensions (in meters)
-			// IMPORTANT: Update these to match the physical distance between your robot's hip joints!
-			double BODY_LENGTH = 0.56; // X-distance between front and rear hips
-			double BODY_WIDTH  = 0.31; // Z-distance between left and right hips
+	if (gait == 5) { // Active PID Posture Balancing
 
-			// Optional: Add a tuning gain. Start at 1.0 (pure geometry).
-			// If it overcompensates, lower it (e.g., 0.8). If it droops, raise it (e.g., 1.2).
+			// 1. Calculate time delta (dt) for Calculus (I and D)
+			double dt = t - last_pid_time;
+			if (dt <= 0.0) dt = 0.001; // Prevent division by zero on first loop
+			last_pid_time = t;
+
+			// 2. Calculate Errors (Target is 0.0 degrees)
+			double pitch_error =  pitch_deg;
+			double roll_error  =  roll_deg;
 
 
-			// 2. Convert global IMU degrees to radians for math functions
-			double pitch_rad = pitch_deg * (M_PI / 180.0);
-			double roll_rad  = roll_deg  * (M_PI / 180.0);
 
-			// 3. Calculate Height Offsets
-			// Delta Y Pitch: If nose goes up (pitch > 0), this is positive.
-			double delta_y_pitch = K_balance * (BODY_LENGTH / 2.0) * sin(pitch_rad);
+			// 3. Proportional Term (Drive to zero)
+			P_pitch = Kp_bal * pitch_error;
+			double P_roll  = Kp_bal * roll_error;
 
-			// Delta Y Roll: If left side goes down (roll > 0), this is positive.
-			double delta_y_roll  = 0;//K_balance * (BODY_WIDTH / 2.0)  * sin(roll_rad);
+			// 4. Integral Term (Remove steady-state droop)
+			pitch_integral += pitch_error * dt;
+			roll_integral  += roll_error * dt;
 
-			// Delta X: When the body pitches, the Center of Mass shifts forward/backward.
-			// This keeps the feet directly under the hips to maintain stability.
-			double delta_x_pitch = 0;//initial_height * sin(pitch_rad);
+			// Anti-windup (prevent integral from spooling up infinitely)
+			pitch_integral = saturate(pitch_integral, -50.0, 50.0);
+			roll_integral  = saturate(roll_integral, -50.0, 50.0);
 
-			// 4. Apply offsets to each leg
-			// (Note: Y is negative going downwards. Adding to a negative Y makes the leg shorter.)
+			I_pitch = Ki_bal * pitch_integral;
+			double I_roll  = Ki_bal * roll_integral;
 
-			// Front Left (LF): Shortens if nose up, shortens if left side down
-			all_pos.lf.x = delta_x_pitch;
+
+
+
+			// 5. Derivative Term (Dampen the motion)
+			double pitch_deriv = (pitch_error - pitch_prev_error) / dt;
+			double roll_deriv  = (roll_error - roll_prev_error) / dt;
+
+			D_pitch = Kd_bal * pitch_deriv;
+			double D_roll  = Kd_bal * roll_deriv;
+
+			// Save errors for next loop
+			pitch_prev_error = pitch_error;
+			roll_prev_error  = roll_error;
+
+			// 6. Calculate Total PID Output
+			double delta_y_pitch = P_pitch + I_pitch + D_pitch;
+			double delta_y_roll  = P_roll  + I_roll  + D_roll;
+
+			// 7. Bound the Unexpected Motions (Saturation)
+			delta_y_pitch = saturate(delta_y_pitch, -MAX_COMPENSATION, MAX_COMPENSATION);
+			delta_y_roll  = 0;//saturate(delta_y_roll, -MAX_COMPENSATION, MAX_COMPENSATION);
+
+			// 8. Apply Offsets to Legs (Y is negative going down)
+			// Front Left (LF)
+			all_pos.lf.x = 0.0;
 			all_pos.lf.y = -initial_height + delta_y_pitch - delta_y_roll;
 
-			// Right Front (RF): Shortens if nose up, lengthens if right side down
-			all_pos.rf.x = delta_x_pitch;
+			// Right Front (RF)
+			all_pos.rf.x = 0.0;
 			all_pos.rf.y = -initial_height + delta_y_pitch + delta_y_roll;
 
-			// Left Hind (LH): Lengthens if nose up, shortens if left side down
-			all_pos.lh.x = delta_x_pitch;
+			// Left Hind (LH)
+			all_pos.lh.x = 0.0;
 			all_pos.lh.y = -initial_height - delta_y_pitch - delta_y_roll;
 
-			// Right Hind (RH): Lengthens if nose up, lengthens if right side down
-			all_pos.rh.x = delta_x_pitch;
+			// Right Hind (RH)
+			all_pos.rh.x = 0.0;
 			all_pos.rh.y = -initial_height - delta_y_pitch + delta_y_roll;
 		}
 

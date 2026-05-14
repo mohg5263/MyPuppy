@@ -151,6 +151,13 @@ static uint32_t timeNowUs(void);
 /* USER CODE BEGIN 0 */
 /* SH2 Sensor Logic Variables */
 float r, i, j, k, acc_deg, x, y, z;
+
+// --- NEW GLOBAL IMU VARIABLES ---
+volatile float roll_deg = 0.0f;
+volatile float pitch_deg = 0.0f;
+volatile float yaw_deg = 0.0f;
+
+
 sh2_ProductIds_t prodIds;
 sh2_Hal_t *pSh2Hal = 0;
 bool resetOccurred = false;
@@ -521,9 +528,12 @@ static void printEvent(void * cookie, sh2_SensorEvent_t * event) {
             j = value.un.gameRotationVector.j;    // Y
             k = value.un.gameRotationVector.k;    // Z
 
-            float yaw_deg = atan2f(2.0f * (i * j + k * r), i * i - j * j - k * k + r * r) * scaleRadToDeg;
-            float pitch_deg = asinf(-2.0f * (i * k - j * r)) * scaleRadToDeg;
-            float roll_deg = atan2f(2.0f * (j * k + i * r), -i * i - j * j + k * k + r * r) * scaleRadToDeg;
+            yaw_deg = atan2f(2.0f * (i * j + k * r), i * i - j * j - k * k + r * r) * scaleRadToDeg;
+            pitch_deg = asinf(-2.0f * (i * k - j * r)) * scaleRadToDeg;
+            roll_deg = atan2f(2.0f * (j * k + i * r), -i * i - j * j + k * k + r * r) * scaleRadToDeg;
+
+
+
             printf("%8.4f Orientation | Roll: %6.2f | Pitch: %6.2f | Yaw: %6.2f\n\r",
                    (double)t, (double)roll_deg, (double)pitch_deg, (double)yaw_deg);
             break;

@@ -531,9 +531,6 @@ static void printEvent(void * cookie, sh2_SensorEvent_t * event) {
             yaw_deg = atan2f(2.0f * (i * j + k * r), i * i - j * j - k * k + r * r) * scaleRadToDeg;
             pitch_deg = asinf(-2.0f * (i * k - j * r)) * scaleRadToDeg;
             roll_deg = atan2f(2.0f * (j * k + i * r), -i * i - j * j + k * k + r * r) * scaleRadToDeg;
-
-
-
             printf("%8.4f Orientation | Roll: %6.2f | Pitch: %6.2f | Yaw: %6.2f\n\r",
                    (double)t, (double)roll_deg, (double)pitch_deg, (double)yaw_deg);
             break;

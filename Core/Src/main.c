@@ -1525,7 +1525,7 @@ LegPositions getLegPositions(double t) {
 			double delta_y_pitch = K_balance * (BODY_LENGTH / 2.0) * sin(pitch_rad);
 
 			// Delta Y Roll: If left side goes down (roll > 0), this is positive.
-			double delta_y_roll  = K_balance * (BODY_WIDTH / 2.0)  * sin(roll_rad);
+			double delta_y_roll  = 0;//K_balance * (BODY_WIDTH / 2.0)  * sin(roll_rad);
 
 			// Delta X: When the body pitches, the Center of Mass shifts forward/backward.
 			// This keeps the feet directly under the hips to maintain stability.

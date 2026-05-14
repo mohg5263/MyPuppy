@@ -1504,16 +1504,7 @@ LegPositions getLegPositions(double t) {
 		return all_pos;
 	}
 
-	if (gait == 4) {
-		// Front legs (Targets 22 deg, 122 deg) -> X = -0.210m, Y = -0.273m
-		all_pos.lf.x = -0.210; all_pos.lf.y = -0.273;
-		all_pos.rf.x = -0.210; all_pos.rf.y = -0.273;
 
-		// Back legs (Targets 36 deg, 125 deg) -> X = 0.138m, Y = -0.297m
-		all_pos.lh.x =  0.138; all_pos.lh.y = -0.297;
-		all_pos.rh.x =  0.138; all_pos.rh.y = -0.297;
-		return all_pos;
-	}
 
 
 
@@ -1523,12 +1514,14 @@ LegPositions getLegPositions(double t) {
 		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RH);
 		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
 		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH);
-	} else if (gait == 2) { // Trot
+	}
+	if (gait == 2) { // Trot
 		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
 		all_pos.rh = leg_xy(t, T, beta, L, H, ph_LF);
 		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
 		all_pos.lh = leg_xy(t, T, beta, L, H, ph_RF);
-	} else if (gait == 3) { //  Heavy Lift Squat Test
+	}
+	if (gait == 3) { //  Heavy Lift Squat Test
 
 		// --- SATURATION LOGIC ---
 		// Define physical limits based on leg lengths (l1+l2 = 0.71m)
@@ -1557,6 +1550,17 @@ LegPositions getLegPositions(double t) {
 	    all_pos.rh.x = 0.0; all_pos.rh.y = -current_h;
 	    all_pos.rf.x = 0.0; all_pos.rf.y = -current_h;
 	    all_pos.lh.x = 0.0; all_pos.lh.y = -current_h;
+	}
+
+	if (gait == 4) {
+		// Front legs (Targets 22 deg, 122 deg) -> X = -0.210m, Y = -0.273m
+		all_pos.lf.x = -0.210; all_pos.lf.y = -0.273;
+		all_pos.rf.x = -0.210; all_pos.rf.y = -0.273;
+
+		// Back legs (Targets 36 deg, 125 deg) -> X = 0.138m, Y = -0.297m
+		all_pos.lh.x =  0.138; all_pos.lh.y = -0.297;
+		all_pos.rh.x =  0.138; all_pos.rh.y = -0.297;
+		return all_pos;
 	}
 
 

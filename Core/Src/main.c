@@ -157,6 +157,8 @@ volatile float roll_deg = 0.0f;
 volatile float pitch_deg = 0.0f;
 volatile float yaw_deg = 0.0f;
 
+volatile double K_balance = 1.0;
+
 
 sh2_ProductIds_t prodIds;
 sh2_Hal_t *pSh2Hal = 0;
@@ -1503,6 +1505,52 @@ LegPositions getLegPositions(double t) {
 		all_pos.lh.x = 0.0; all_pos.lh.y = -initial_height;
 		return all_pos;
 	}
+	if (gait == 5) { // Active Posture Detection / Balancing
+
+			// 1. Define Robot Chassis Dimensions (in meters)
+			// IMPORTANT: Update these to match the physical distance between your robot's hip joints!
+			double BODY_LENGTH = 0.56; // X-distance between front and rear hips
+			double BODY_WIDTH  = 0.31; // Z-distance between left and right hips
+
+			// Optional: Add a tuning gain. Start at 1.0 (pure geometry).
+			// If it overcompensates, lower it (e.g., 0.8). If it droops, raise it (e.g., 1.2).
+
+
+			// 2. Convert global IMU degrees to radians for math functions
+			double pitch_rad = pitch_deg * (M_PI / 180.0);
+			double roll_rad  = roll_deg  * (M_PI / 180.0);
+
+			// 3. Calculate Height Offsets
+			// Delta Y Pitch: If nose goes up (pitch > 0), this is positive.
+			double delta_y_pitch = K_balance * (BODY_LENGTH / 2.0) * sin(pitch_rad);
+
+			// Delta Y Roll: If left side goes down (roll > 0), this is positive.
+			double delta_y_roll  = K_balance * (BODY_WIDTH / 2.0)  * sin(roll_rad);
+
+			// Delta X: When the body pitches, the Center of Mass shifts forward/backward.
+			// This keeps the feet directly under the hips to maintain stability.
+			double delta_x_pitch = 0;//initial_height * sin(pitch_rad);
+
+			// 4. Apply offsets to each leg
+			// (Note: Y is negative going downwards. Adding to a negative Y makes the leg shorter.)
+
+			// Front Left (LF): Shortens if nose up, shortens if left side down
+			all_pos.lf.x = delta_x_pitch;
+			all_pos.lf.y = -initial_height + delta_y_pitch - delta_y_roll;
+
+			// Right Front (RF): Shortens if nose up, lengthens if right side down
+			all_pos.rf.x = delta_x_pitch;
+			all_pos.rf.y = -initial_height + delta_y_pitch + delta_y_roll;
+
+			// Left Hind (LH): Lengthens if nose up, shortens if left side down
+			all_pos.lh.x = delta_x_pitch;
+			all_pos.lh.y = -initial_height - delta_y_pitch - delta_y_roll;
+
+			// Right Hind (RH): Lengthens if nose up, lengthens if right side down
+			all_pos.rh.x = delta_x_pitch;
+			all_pos.rh.y = -initial_height - delta_y_pitch + delta_y_roll;
+		}
+
 
 
 
@@ -1562,6 +1610,7 @@ LegPositions getLegPositions(double t) {
 		all_pos.rh.x =  0.138; all_pos.rh.y = -0.297;
 		return all_pos;
 	}
+
 
 
 	return all_pos;

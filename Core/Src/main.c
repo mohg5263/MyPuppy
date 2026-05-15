@@ -158,15 +158,21 @@ volatile float pitch_deg = 0.0f;
 volatile float yaw_deg = 0.0f;
 
 // --- Posture PID Control Variables ---
-// Tuning Gains (Start small and tune up!)
-double Kd_bal = 0.0005; // Proportional: Drives error to zero
+
+
+double Kd_bal= 0.0008; // Derivative: Damps the motion
 double Ki_bal = 0.001; // Integral: Removes steady-state offset (start at 0)
-double Kp_bal = 0.01; // Derivative: Damps the motion
+double Kp_bal = 0.007; // Proportional: Drives error to zero
 
 
 double P_pitch =0;
 double I_pitch =0;
 double D_pitch =0;
+
+
+double P_roll = 0;
+double I_roll = 0;
+double D_roll = 0;
 
 
 // State Tracking
@@ -1539,7 +1545,7 @@ LegPositions getLegPositions(double t) {
 
 			// 3. Proportional Term (Drive to zero)
 			P_pitch = Kp_bal * pitch_error;
-			double P_roll  = Kp_bal * roll_error;
+			P_roll  = Kp_bal * roll_error;
 
 			// 4. Integral Term (Remove steady-state droop)
 			pitch_integral += pitch_error * dt;
@@ -1550,7 +1556,7 @@ LegPositions getLegPositions(double t) {
 			roll_integral  = saturate(roll_integral, -50.0, 50.0);
 
 			I_pitch = Ki_bal * pitch_integral;
-			double I_roll  = Ki_bal * roll_integral;
+			I_roll  = Ki_bal * roll_integral;
 
 
 
@@ -1560,7 +1566,7 @@ LegPositions getLegPositions(double t) {
 			double roll_deriv  = (roll_error - roll_prev_error) / dt;
 
 			D_pitch = Kd_bal * pitch_deriv;
-			double D_roll  = Kd_bal * roll_deriv;
+			D_roll  = Kd_bal * roll_deriv;
 
 			// Save errors for next loop
 			pitch_prev_error = pitch_error;
@@ -1571,8 +1577,8 @@ LegPositions getLegPositions(double t) {
 			double delta_y_roll  = P_roll  + I_roll  + D_roll;
 
 			// 7. Bound the Unexpected Motions (Saturation)
-			delta_y_pitch = saturate(delta_y_pitch, -MAX_COMPENSATION, MAX_COMPENSATION);
-			delta_y_roll  = 0;//saturate(delta_y_roll, -MAX_COMPENSATION, MAX_COMPENSATION);
+			delta_y_pitch = 0;//saturate(delta_y_pitch, -MAX_COMPENSATION, MAX_COMPENSATION);
+			delta_y_roll  = saturate(delta_y_roll, -MAX_COMPENSATION, MAX_COMPENSATION);
 
 			// 8. Apply Offsets to Legs (Y is negative going down)
 			// Front Left (LF)

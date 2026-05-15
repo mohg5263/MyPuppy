@@ -158,11 +158,14 @@ volatile float pitch_deg = 0.0f;
 volatile float yaw_deg = 0.0f;
 
 // --- Posture PID Control Variables ---
+double Kd_bal_pitch = 0.0005; // Derivative: Damps the motion
+double Ki_bal_pitch = 0.001; // Integral: Removes steady-state offset (start at 0)
+double Kp_bal_pitch = 0.01; // Proportional: Drives error to zero
 
 
-double Kd_bal= 0.0008; // Derivative: Damps the motion
-double Ki_bal = 0.001; // Integral: Removes steady-state offset (start at 0)
-double Kp_bal = 0.007; // Proportional: Drives error to zero
+double Kd_bal_roll = 0.0008; // Derivative: Damps the motion
+double Ki_bal_roll = 0.001; // Integral: Removes steady-state offset (start at 0)
+double Kp_bal_roll = 0.007; // Proportional: Drives error to zero
 
 
 double P_pitch =0;
@@ -1544,8 +1547,8 @@ LegPositions getLegPositions(double t) {
 
 
 			// 3. Proportional Term (Drive to zero)
-			P_pitch = Kp_bal * pitch_error;
-			P_roll  = Kp_bal * roll_error;
+			P_pitch = Kp_bal_pitch * pitch_error;
+			P_roll  = Kp_bal_roll * roll_error;
 
 			// 4. Integral Term (Remove steady-state droop)
 			pitch_integral += pitch_error * dt;
@@ -1555,8 +1558,8 @@ LegPositions getLegPositions(double t) {
 			pitch_integral = saturate(pitch_integral, -50.0, 50.0);
 			roll_integral  = saturate(roll_integral, -50.0, 50.0);
 
-			I_pitch = Ki_bal * pitch_integral;
-			I_roll  = Ki_bal * roll_integral;
+			I_pitch = Ki_bal_pitch * pitch_integral;
+			I_roll  = Ki_bal_roll * roll_integral;
 
 
 
@@ -1565,8 +1568,8 @@ LegPositions getLegPositions(double t) {
 			double pitch_deriv = (pitch_error - pitch_prev_error) / dt;
 			double roll_deriv  = (roll_error - roll_prev_error) / dt;
 
-			D_pitch = Kd_bal * pitch_deriv;
-			D_roll  = Kd_bal * roll_deriv;
+			D_pitch = Kd_bal_pitch * pitch_deriv;
+			D_roll  = Kd_bal_roll * roll_deriv;
 
 			// Save errors for next loop
 			pitch_prev_error = pitch_error;
@@ -1577,7 +1580,7 @@ LegPositions getLegPositions(double t) {
 			double delta_y_roll  = P_roll  + I_roll  + D_roll;
 
 			// 7. Bound the Unexpected Motions (Saturation)
-			delta_y_pitch = 0;//saturate(delta_y_pitch, -MAX_COMPENSATION, MAX_COMPENSATION);
+			delta_y_pitch = saturate(delta_y_pitch, -MAX_COMPENSATION, MAX_COMPENSATION);
 			delta_y_roll  = saturate(delta_y_roll, -MAX_COMPENSATION, MAX_COMPENSATION);
 
 			// 8. Apply Offsets to Legs (Y is negative going down)

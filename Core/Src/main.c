@@ -438,10 +438,10 @@ volatile uint32_t imu_timer_overflows = 0;
 float seconds_elapsed = 0;
 
 
-double T = 1.0;
-double beta = 0.65;
-double L = 0.2;
-double H = 0.15;
+float T = 1.0;
+float beta = 0.65;
+float L = 0.2;
+float H = 0.15;
 
 
 
@@ -944,7 +944,7 @@ static void MX_TIM6_Init(void)
 
   /* USER CODE END TIM6_Init 1 */
   htim6.Instance = TIM6;
-  htim6.Init.Prescaler = 8-1;
+  htim6.Init.Prescaler = 4-1;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim6.Init.Period = 50000-1;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -1472,38 +1472,37 @@ IKResult IK(float x, float y, float theta2_min, float theta2_max)
 
 // Structure to hold the output of leg_xy
 typedef struct {
-    double x;
-    double y;
+    float x;
+    float y;
 } LegPosition;
 
 // Function to compute the x and y coordinates for a single leg
-LegPosition leg_xy(double t, double T, double beta, double L, double H, double phaseFrac) {
+LegPosition leg_xy(float t, float T, float beta, float L, float H, float phaseFrac) {
     LegPosition pos;
 
+    float offset = phaseFrac * T;
+    float local_t = fmodf(t - offset, T);
 
-
-    double offset = phaseFrac * T;
-    double local_t = fmod(t - offset, T);
-
-    if (local_t < 0) {
-        local_t += T; // Ensure positive modulo result
+    if (local_t < 0.0f) {
+        local_t += T;
     }
 
-    double v = L / (beta * T);
+    float v = L / (beta * T);
 
     if (local_t < beta * T) {
         // Stance phase
-        pos.x = L / 2.0 - v * local_t;
+        pos.x = L / 2.0f - v * local_t;
         pos.y = -initial_height;
     } else {
         // Swing phase
-        double tau = (local_t - beta * T) / ((1 - beta) * T);
-        pos.x = -L / 2.0 - v * tau + 3.0 * (L + v) * pow(tau, 2) - 2.0 * (L + v) * pow(tau, 3);
-        // NEW CODE: Sine-Squared Curve
-		// - Ranges exactly from 0 to H (not 2H)
-		// - Starts and ends with 0 velocity
-		// - Acceleration is smoother than the cosine hump
-		pos.y = -initial_height + H * pow(sin(M_PI * tau), 2);
+        float tau = (local_t - beta * T) / ((1.0f - beta) * T);
+        float tau_sq = tau * tau;   // REPLACES pow(tau, 2)
+        float tau_cub = tau_sq * tau; // REPLACES pow(tau, 3)
+
+        pos.x = -L / 2.0f - v * tau + 3.0f * (L + v) * tau_sq - 2.0f * (L + v) * tau_cub;
+
+        float s = sinf(M_PI * tau); // REPLACES double sin()
+        pos.y = -initial_height + H * (s * s); // REPLACES pow(sin, 2)
     }
     return pos;
 }

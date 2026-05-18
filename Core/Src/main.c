@@ -129,7 +129,6 @@ float interpolateHipAngle(float);
 float interpolateKneeAngle(float);
 void Stop_Motors(int, int, int, int, int, int, int, int);
 
-
 /* Function Prototypes */
 void updateControlParameters();
 void updateRamp(int motorIdx); // NEW: Prototype for updateRamp function
@@ -141,10 +140,7 @@ static void spiActivate(void);
 static void spiCompleted(void);
 static uint32_t timeNowUs(void);
 
-
-
-// Prototype of the template function
-
+/* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
@@ -156,9 +152,6 @@ volatile float roll_deg = 0.0f;
 volatile float pitch_deg = 0.0f;
 volatile float yaw_deg = 0.0f;
 
-// Add these two lines here!
-volatile float gyro_pitch_rate = 0.0f;
-volatile float gyro_roll_rate = 0.0f;
 
 // --- Posture PID Control Variables ---
 float Kd_bal_pitch = 0.0005f; // Derivative: Damps the motion
@@ -509,8 +502,8 @@ static void startReports() {
         sh2_SensorConfig_t config;
     } sensorConfig[] = {
         // Game Rotation Vector, 100Hz
-		{SH2_GAME_ROTATION_VECTOR, {.reportInterval_us = 5000}},
-		{SH2_GYROSCOPE_CALIBRATED, {.reportInterval_us = 5000}} // Add this
+		{SH2_GAME_ROTATION_VECTOR, {.reportInterval_us = 2500}},
+
     };
 
     for (int n = 0; n < ARRAY_LEN(sensorConfig); n++) {
@@ -567,11 +560,7 @@ static void printEvent(void * cookie, sh2_SensorEvent_t * event) {
             printf("%8.4f Orientation | Roll: %6.2f | Pitch: %6.2f | Yaw: %6.2f\n\r",
                    (double)t, (double)roll_deg, (double)pitch_deg, (double)yaw_deg);
             break;
-        case SH2_GYROSCOPE_CALIBRATED:
-			// Extract rad/s and convert to deg/s for your PID
-			gyro_pitch_rate = value.un.gyroscope.y * scaleRadToDeg;
-			gyro_roll_rate  = value.un.gyroscope.x * scaleRadToDeg;
-			break;
+
         default:
             // Handled other sensors silently to save space
             break;

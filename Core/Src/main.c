@@ -510,8 +510,8 @@ static void startReports() {
         sh2_SensorConfig_t config;
     } sensorConfig[] = {
         // Game Rotation Vector, 100Hz
-		{SH2_GAME_ROTATION_VECTOR, {.reportInterval_us = 10000}},
-		{SH2_GYROSCOPE_CALIBRATED, {.reportInterval_us = 10000}} // Add this
+		{SH2_GAME_ROTATION_VECTOR, {.reportInterval_us = 5000}},
+		{SH2_GYROSCOPE_CALIBRATED, {.reportInterval_us = 5000}} // Add this
     };
 
     for (int n = 0; n < ARRAY_LEN(sensorConfig); n++) {

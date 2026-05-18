@@ -1635,6 +1635,22 @@ LegPositions getLegPositions(double t) {
 		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
 		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH);
 	}
+	if (gait == -1) { // Walk backward
+		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LH);
+		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RF);
+		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RH);
+		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LF);
+
+//		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
+//		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RH);
+//		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
+//		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH);
+
+		all_pos.lf.x = -all_pos.lf.x;
+		all_pos.rh.x = -all_pos.rh.x;
+		all_pos.rf.x = -all_pos.rf.x;
+		all_pos.lh.x = -all_pos.lh.x;
+	}
 	if (gait == 2) { // Trot
 		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
 		all_pos.rh = leg_xy(t, T, beta, L, H, ph_LF);

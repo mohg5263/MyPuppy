@@ -1395,74 +1395,51 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 
 
-// Result struct (like MATLAB multiple outputs)
 typedef struct {
     bool reachable;
-    float theta1_down;
-    float theta2_down;
-    float theta1_up;
-    float theta2_up;
+    float theta1;
+    float theta2;
 } IKResult;
 
-// IK function
-IKResult IK(float x, float y, float theta2_min, float theta2_max)
+// IK function (Now only calculates the requested configuration)
+IKResult IK(float x, float y, float theta2_min, float theta2_max, bool use_up_solution)
 {
-//    const float l1 = 14.50*0.0254;
-//    const float l2 = 13.50*0.0254;
-
-
-
-    // Joint limits in radians
-    const float theta1_min = -60 * M_PI/180; // -60 deg
-    const float theta1_max =  60 * M_PI/180; //  60 deg
-    theta2_min = theta2_min * M_PI/180;; // -130 deg
-    theta2_max =  theta2_max * M_PI/180;; //  50 deg
+    const float theta1_min = -60.0f * M_PI/180.0f;
+    const float theta1_max =  60.0f * M_PI/180.0f;
+    theta2_min = theta2_min * M_PI/180.0f;
+    theta2_max = theta2_max * M_PI/180.0f;
 
     IKResult result;
 
     float r2 = x*x + y*y;
 
-    // Check reachability in workspace
     if (r2 < (l1 - l2)*(l1 - l2) || r2 > (l1 + l2)*(l1 + l2)) {
         result.reachable = false;
         return result;
     }
 
-    // Compute cos(theta2)
     float cos_theta2 = (r2 - l1*l1 - l2*l2) / (2.0f * l1 * l2);
     if (cos_theta2 > 1.0f) cos_theta2 = 1.0f;
     if (cos_theta2 < -1.0f) cos_theta2 = -1.0f;
 
-    float theta2_down = acosf(cos_theta2);
-    float theta2_up   = -acosf(cos_theta2);
+    // ONLY calculate the requested solution
+    float theta2 = use_up_solution ? -acosf(cos_theta2) : acosf(cos_theta2);
 
-    float solve_theta1(float theta2) {
-        float phi = atan2f(x, -y);  // matches MATLAB fix
-        float k1 = l1 + l2 * cosf(theta2);
-        float k2 = l2 * sinf(theta2);
-        float psi = atan2f(k2, k1);
-        return phi - psi;
-    }
-
-    float theta1_down = solve_theta1(theta2_down);
-    float theta1_up   = solve_theta1(theta2_up);
+    float phi = atan2f(x, -y);
+    float k1 = l1 + l2 * cosf(theta2);
+    float k2 = l2 * sinf(theta2);
+    float psi = atan2f(k2, k1);
+    float theta1 = phi - psi;
 
     // Clamp to joint limits
-    if (theta1_down < theta1_min) theta1_down = theta1_min;
-    if (theta1_down > theta1_max) theta1_down = theta1_max;
-    if (theta1_up < theta1_min) theta1_up = theta1_min;
-    if (theta1_up > theta1_max) theta1_up = theta1_max;
+    if (theta1 < theta1_min) theta1 = theta1_min;
+    if (theta1 > theta1_max) theta1 = theta1_max;
+    if (theta2 < theta2_min) theta2 = theta2_min;
+    if (theta2 > theta2_max) theta2 = theta2_max;
 
-    if (theta2_down < theta2_min) theta2_down = theta2_min;
-    if (theta2_down > theta2_max) theta2_down = theta2_max;
-    if (theta2_up < theta2_min) theta2_up = theta2_min;
-    if (theta2_up > theta2_max) theta2_up = theta2_max;
-
-    result.theta1_down = theta1_down;
-    result.theta2_down = theta2_down;
-    result.theta1_up   = theta1_up;
-    result.theta2_up   = theta2_up;
-    result.reachable   = true;
+    result.theta1 = theta1;
+    result.theta2 = theta2;
+    result.reachable = true;
 
     return result;
 }
@@ -1760,34 +1737,34 @@ void updateControlParameters() {
 
 
 
-    IKResult sol1 = IK(xyCoords.rf.x , xyCoords.rf.y , -130,50);
+    IKResult sol1 = IK(xyCoords.rf.x , xyCoords.rf.y , -130,50, true);
 
-    AngleH1=sol1.theta1_up * 180.0f / M_PI - 22.0f;
-    AngleK1=sol1.theta2_up * 180.0f / M_PI + 122.0f;
+    AngleH1=sol1.theta1 * 180.0f / M_PI - 22.0f;
+    AngleK1=sol1.theta2 * 180.0f / M_PI + 122.0f;
 
 
-    IKResult sol2 = IK(-xyCoords.lf.x, xyCoords.lf.y, -50, 130);
+    IKResult sol2 = IK(-xyCoords.lf.x, xyCoords.lf.y, -50, 130, false);
 
-    AngleH2=sol2.theta1_down * 180.0f / M_PI + 22.0f;
-    AngleK2=sol2.theta2_down * 180.0f / M_PI - 122.0f;
+    AngleH2=sol2.theta1 * 180.0f / M_PI + 22.0f;
+    AngleK2=sol2.theta2 * 180.0f / M_PI - 122.0f;
 
 
 
 
     // **Limb 3 Control
-    IKResult sol3 = IK(xyCoords.rh.x, xyCoords.rh.y, -50, 130);
+    IKResult sol3 = IK(xyCoords.rh.x, xyCoords.rh.y, -50, 130, false);
 
-    AngleH3=sol3.theta1_down * 180.0f / M_PI + 36.0f;
-    AngleK3=sol3.theta2_down * 180.0f / M_PI - 125.0f;
+    AngleH3=sol3.theta1 * 180.0f / M_PI + 36.0f;
+    AngleK3=sol3.theta2 * 180.0f / M_PI - 125.0f;
 
 
     // **Limb 4 Control
 
 
-    IKResult sol4 = IK(-xyCoords.lh.x, xyCoords.lh.y, -130, 50);
+    IKResult sol4 = IK(-xyCoords.lh.x, xyCoords.lh.y, -130, 50, true);
 
-    AngleH4=sol4.theta1_up * 180.0f / M_PI - 36.0f;
-    AngleK4=sol4.theta2_up * 180.0f / M_PI + 125.0f;
+    AngleH4=sol4.theta1 * 180.0f / M_PI - 36.0f;
+    AngleK4=sol4.theta2 * 180.0f / M_PI + 125.0f;
 
 
 

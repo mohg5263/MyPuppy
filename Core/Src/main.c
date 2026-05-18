@@ -157,6 +157,10 @@ volatile float roll_deg = 0.0f;
 volatile float pitch_deg = 0.0f;
 volatile float yaw_deg = 0.0f;
 
+// Add these two lines here!
+volatile float gyro_pitch_rate = 0.0f;
+volatile float gyro_roll_rate = 0.0f;
+
 // --- Posture PID Control Variables ---
 double Kd_bal_pitch = 0.0005; // Derivative: Damps the motion
 double Ki_bal_pitch = 0.001; // Integral: Removes steady-state offset (start at 0)
@@ -184,7 +188,7 @@ double pitch_prev_error = 0.0, roll_prev_error = 0.0;
 double last_pid_time = 0.0;
 
 // Output limits to prevent unexpected extreme motions (in meters)
-double MAX_COMPENSATION = 0.1; // Max 10cm adjustment per leg
+double MAX_COMPENSATION = 0.05; // Max 10cm adjustment per leg
 
 
 sh2_ProductIds_t prodIds;
@@ -506,7 +510,8 @@ static void startReports() {
         sh2_SensorConfig_t config;
     } sensorConfig[] = {
         // Game Rotation Vector, 100Hz
-        {SH2_GAME_ROTATION_VECTOR, {.reportInterval_us = 10000}}
+		{SH2_GAME_ROTATION_VECTOR, {.reportInterval_us = 10000}},
+		{SH2_GYROSCOPE_CALIBRATED, {.reportInterval_us = 10000}} // Add this
     };
 
     for (int n = 0; n < ARRAY_LEN(sensorConfig); n++) {
@@ -563,6 +568,11 @@ static void printEvent(void * cookie, sh2_SensorEvent_t * event) {
             printf("%8.4f Orientation | Roll: %6.2f | Pitch: %6.2f | Yaw: %6.2f\n\r",
                    (double)t, (double)roll_deg, (double)pitch_deg, (double)yaw_deg);
             break;
+        case SH2_GYROSCOPE_CALIBRATED:
+			// Extract rad/s and convert to deg/s for your PID
+			gyro_pitch_rate = value.un.gyroscope.y * scaleRadToDeg;
+			gyro_roll_rate  = value.un.gyroscope.x * scaleRadToDeg;
+			break;
         default:
             // Handled other sensors silently to save space
             break;
@@ -1533,57 +1543,57 @@ LegPositions getLegPositions(double t) {
 		return all_pos;
 	}
 
+
+	// 2. --- CALCULATE ACTIVE POSTURE PID OFFSETS ---
+	double delta_y_pitch = 0.0;
+	double delta_y_roll = 0.0;
+
+	// Calculate PID continuously if we are in a gait that uses it
+	if (gait == 5 || gait == 6) {
+		double dt = t - last_pid_time;
+		if (dt <= 0.0) dt = 0.001;
+		last_pid_time = t;
+
+		double pitch_error = pitch_deg;
+		double roll_error  = roll_deg;
+
+		P_pitch = Kp_bal_pitch * pitch_error;
+		P_roll  = Kp_bal_roll * roll_error;
+
+		pitch_integral += pitch_error * dt;
+		roll_integral  += roll_error * dt;
+
+		pitch_integral = saturate(pitch_integral, -50.0, 50.0);
+		roll_integral  = saturate(roll_integral, -50.0, 50.0);
+
+		I_pitch = Ki_bal_pitch * pitch_integral;
+		I_roll  = Ki_bal_roll * roll_integral;
+
+		double pitch_deriv = (pitch_error - pitch_prev_error) / dt;
+		double roll_deriv  = (roll_error - roll_prev_error) / dt;
+
+		D_pitch = Kd_bal_pitch * (pitch_deriv);
+		D_roll  = Kd_bal_roll * (roll_deriv);
+
+		//		D_pitch = Kd_bal_pitch * (-gyro_pitch_rate);
+		//		D_roll  = Kd_bal_roll * (-gyro_roll_rate);
+
+		pitch_prev_error = pitch_error;
+		roll_prev_error  = roll_error;
+
+		delta_y_pitch = P_pitch + I_pitch + D_pitch;
+		delta_y_roll  = P_roll  + I_roll  + D_roll;
+
+		delta_y_pitch = saturate(delta_y_pitch, -MAX_COMPENSATION, MAX_COMPENSATION);
+		delta_y_roll  = saturate(delta_y_roll, -MAX_COMPENSATION, MAX_COMPENSATION);
+	}
+
+
+
+
 	if (gait == 5) { // Active PID Posture Balancing
 
-			// 1. Calculate time delta (dt) for Calculus (I and D)
-			double dt = t - last_pid_time;
-			if (dt <= 0.0) dt = 0.001; // Prevent division by zero on first loop
-			last_pid_time = t;
-
-			// 2. Calculate Errors (Target is 0.0 degrees)
-			double pitch_error =  pitch_deg;
-			double roll_error  =  roll_deg;
-
-
-
-			// 3. Proportional Term (Drive to zero)
-			P_pitch = Kp_bal_pitch * pitch_error;
-			P_roll  = Kp_bal_roll * roll_error;
-
-			// 4. Integral Term (Remove steady-state droop)
-			pitch_integral += pitch_error * dt;
-			roll_integral  += roll_error * dt;
-
-			// Anti-windup (prevent integral from spooling up infinitely)
-			pitch_integral = saturate(pitch_integral, -50.0, 50.0);
-			roll_integral  = saturate(roll_integral, -50.0, 50.0);
-
-			I_pitch = Ki_bal_pitch * pitch_integral;
-			I_roll  = Ki_bal_roll * roll_integral;
-
-
-
-
-			// 5. Derivative Term (Dampen the motion)
-			double pitch_deriv = (pitch_error - pitch_prev_error) / dt;
-			double roll_deriv  = (roll_error - roll_prev_error) / dt;
-
-			D_pitch = Kd_bal_pitch * pitch_deriv;
-			D_roll  = Kd_bal_roll * roll_deriv;
-
-			// Save errors for next loop
-			pitch_prev_error = pitch_error;
-			roll_prev_error  = roll_error;
-
-			// 6. Calculate Total PID Output
-			double delta_y_pitch = P_pitch + I_pitch + D_pitch;
-			double delta_y_roll  = P_roll  + I_roll  + D_roll;
-
-			// 7. Bound the Unexpected Motions (Saturation)
-			delta_y_pitch = saturate(delta_y_pitch, -MAX_COMPENSATION, MAX_COMPENSATION);
-			delta_y_roll  = saturate(delta_y_roll, -MAX_COMPENSATION, MAX_COMPENSATION);
-
-			// 8. Apply Offsets to Legs (Y is negative going down)
+			// Apply Offsets to Legs (Y is negative going down)
 			// Front Left (LF)
 			all_pos.lf.x = 0.0;
 			all_pos.lf.y = -initial_height + delta_y_pitch - delta_y_roll;
@@ -1602,7 +1612,19 @@ LegPositions getLegPositions(double t) {
 		}
 
 
+	// 2. Calculate Raw Leg Positions (Local Trajectories)
+	if (gait == 6) { // Walk with stabilization
+		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
+		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RH);
+		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
+		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH);
 
+		// B. Superimpose the PID Posture offsets onto the Y coordinates
+		all_pos.lf.y += (delta_y_pitch - delta_y_roll);
+		all_pos.rf.y += (delta_y_pitch + delta_y_roll);
+		all_pos.lh.y += (-delta_y_pitch - delta_y_roll);
+		all_pos.rh.y += (-delta_y_pitch + delta_y_roll);
+	}
 
 
 

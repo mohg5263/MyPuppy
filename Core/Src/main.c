@@ -145,7 +145,6 @@ static uint32_t timeNowUs(void);
 
 // Prototype of the template function
 
-/* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
@@ -162,33 +161,33 @@ volatile float gyro_pitch_rate = 0.0f;
 volatile float gyro_roll_rate = 0.0f;
 
 // --- Posture PID Control Variables ---
-double Kd_bal_pitch = 0.0005; // Derivative: Damps the motion
-double Ki_bal_pitch = 0.001; // Integral: Removes steady-state offset (start at 0)
-double Kp_bal_pitch = 0.01; // Proportional: Drives error to zero
+float Kd_bal_pitch = 0.0005f; // Derivative: Damps the motion
+float Ki_bal_pitch = 0.001f; // Integral: Removes steady-state offset (start at 0)
+float Kp_bal_pitch = 0.01f; // Proportional: Drives error to zero
 
 
-double Kd_bal_roll = 0.0008; // Derivative: Damps the motion
-double Ki_bal_roll = 0.001; // Integral: Removes steady-state offset (start at 0)
-double Kp_bal_roll = 0.007; // Proportional: Drives error to zero
+float Kd_bal_roll = 0.0008f; // Derivative: Damps the motion
+float Ki_bal_roll = 0.001f; // Integral: Removes steady-state offset (start at 0)
+float Kp_bal_roll = 0.007f; // Proportional: Drives error to zero
 
 
-double P_pitch =0;
-double I_pitch =0;
-double D_pitch =0;
+float P_pitch =0.0f;
+float I_pitch =0.0f;
+float D_pitch =0.0f;
 
 
-double P_roll = 0;
-double I_roll = 0;
-double D_roll = 0;
+float P_roll = 0.0f;
+float I_roll = 0.f;
+float D_roll = 0.f;
 
 
 // State Tracking
-double pitch_integral = 0.0, roll_integral = 0.0;
-double pitch_prev_error = 0.0, roll_prev_error = 0.0;
-double last_pid_time = 0.0;
+float pitch_integral = 0.0f, roll_integral = 0.0f;
+float pitch_prev_error = 0.0f, roll_prev_error = 0.0f;
+float last_pid_time = 0.0f;
 
 // Output limits to prevent unexpected extreme motions (in meters)
-double MAX_COMPENSATION = 0.05; // Max 10cm adjustment per leg
+float MAX_COMPENSATION = 0.1f; // Max 10cm adjustment per leg
 
 
 sh2_ProductIds_t prodIds;
@@ -325,131 +324,131 @@ int motorActivated6 = 1;
 int motorActivated7 = 1;
 int motorActivated8 = 1;
 
-double Kp1=0;
-double Kd1=0;
+float Kp1=0.0f;
+float Kd1=0.0f;
 
-double Kp2=0;
-double Kd2=0;
+float Kp2=0.0f;
+float Kd2=0.0f;
 
-double Kp3=0;
-double Kd3=0;
+float Kp3=0.0f;
+float Kd3=0.0f;
 
-double Kp4=0;
-double Kd4=0;
+float Kp4=0.0f;
+float Kd4=0.0f;
 
-double Kp5=0;
-double Kd5=0;
+float Kp5=0.0f;
+float Kd5=0.0f;
 
-double Kp6=0;
-double Kd6=0;
+float Kp6=0.0f;
+float Kd6=0.0f;
 
-double Kp7=0;
-double Kd7=0;
+float Kp7=0.0f;
+float Kd7=0.0f;
 
-double Kp8=0;
-double Kd8=0;
-
-
+float Kp8=0.0f;
+float Kd8=0.0f;
 
 
 
-double error1, lastError1 = 0;
-double integral1 = 0;
-double derivative1;
-float torqueF1 = 0;
-float speedF1 = 0;
-float lastPos1;
-float torqSignal1 = 0;
 
-double error2, lastError2 = 0;
-double integral2 = 0;
-double derivative2;
-float torqueF2 = 0;
-float speedF2 = 0;
-float lastPos2;
-float torqSignal2 = 0;
 
-double error3, lastError3 = 0;
-double integral3 = 0;
-double derivative3;
-float torqueF3 = 0;
-float speedF3 = 0;
-float lastPos3;
-float torqSignal3 = 0;
+float error1, lastError1 = 0.0f;
+float integral1 = 0.0f;
+float derivative1=0.0f;
+float torqueF1 = 0.0f;
+float speedF1 = 0.0f;
+float lastPos1=0.0f;
+float torqSignal1 = 0.0f;
 
-double error4, lastError4 = 0;
-double integral4 = 0;
-double derivative4;
-float torqueF4 = 0;
-float speedF4 = 0;
-float lastPos4;
-float torqSignal4 = 0;
+float error2, lastError2 = 0.0f;
+float integral2 = 0.0f;
+float derivative2=0.0f;
+float torqueF2 = 0.0f;
+float speedF2 = 0.0f;
+float lastPos2=0.0f;
+float torqSignal2 = 0.0f;
 
-double error5, lastError5 = 0;
-double integral5 = 0;
-double derivative5;
-float torqueF5 = 0;
-float speedF5 = 0;
-float lastPos5;
-float torqSignal5 = 0;
+float error3, lastError3 = 0.0f;
+float integral3 = 0.0f;
+float derivative3=0.0f;
+float torqueF3 = 0.0f;
+float speedF3 = 0.0f;
+float lastPos3=0.0f;
+float torqSignal3 = 0.0f;
 
-double error6, lastError6 = 0;
-double integral6 = 0;
-double derivative6;
-float torqueF6 = 0;
-float speedF6 = 0;
-float lastPos6;
-float torqSignal6 = 0;
+float error4, lastError4 = 0.0f;
+float integral4 = 0.0f;
+float derivative4 = 0.0f;
+float torqueF4 = 0.0f;
+float speedF4 = 0.0f;
+float lastPos4 = 0.0f;
+float torqSignal4 = 0.0f;
 
-double error7, lastError7 = 0;
-double integral7 = 0;
-double derivative7;
-float torqueF7 = 0;
-float speedF7 = 0;
-float lastPos7;
-float torqSignal7 = 0;
+float error5, lastError5 = 0.0f;
+float integral5 = 0.0f;
+float derivative5 = 0.0f;
+float torqueF5 = 0.0f;
+float speedF5 = 0.0f;
+float lastPos5 = 0.0f;
+float torqSignal5 = 0.0f;
 
-double error8, lastError8 = 0;
-double integral8 = 0;
-double derivative8;
-float torqueF8 = 0;
-float speedF8 = 0;
-float lastPos8;
-float torqSignal8 = 0;
+float error6, lastError6 = 0.0f;
+float integral6 = 0.0f;
+float derivative6 = 0.0f;
+float torqueF6 = 0.0f;
+float speedF6 = 0.0f;
+float lastPos6 = 0.0f;
+float torqSignal6 = 0.0f;
 
-float startTime = 0;
-float currentTime = 0;
-float ttime = 0;
-float ttime1 = 0;
-float ttime2 = 0;
+float error7, lastError7 = 0.0f;
+float integral7 = 0.0f;
+float derivative7 = 0.0f;
+float torqueF7 = 0.0f;
+float speedF7 = 0.0f;
+float lastPos7 = 0.0f;
+float torqSignal7 = 0.0f;
+
+float error8, lastError8 = 0.0f;
+float integral8 = 0.0f;
+float derivative8 = 0.0f;
+float torqueF8 = 0.0f;
+float speedF8 = 0.0f;
+float lastPos8 = 0.0f;
+float torqSignal8 = 0.0f;
+
+float startTime = 0.0f;
+float currentTime = 0.0f;
+float ttime = 0.0f;
+float ttime1 = 0.0f;
+float ttime2 = 0.0f;
 
 
 
 // Global constants for link lengths
-const float l1 = 0.36;
-const float l2 = 0.35;
-double initial_height = l1 + l2 - 0.2;
+const float l1 = 0.36f;
+const float l2 = 0.35f;
+float initial_height = l1 + l2 - 0.2f;
 
 
 uint32_t init_tick;
 
 volatile uint32_t timer_overflows = 0;
 volatile uint32_t imu_timer_overflows = 0;
-float seconds_elapsed = 0;
+float seconds_elapsed = 0.0f;
 
 
-float T = 1.0;
-float beta = 0.65;
-float L = 0.2;
-float H = 0.15;
+float T = 1.0f;
+float beta = 0.65f;
+float L = 0.2f;
+float H = 0.15f;
 
 
 
-double Kp_H=4.0;
-double Kd_H=0.3;
+float Kp_H=4.0f;
+float Kd_H=0.3f;
 
-double Kp_K=4.0;
-double Kd_K=0.3;
+float Kp_K=4.0f;
+float Kd_K=0.3f;
 
 
 // Gait selection
@@ -460,9 +459,9 @@ volatile int robot_command_state = 0; // 0: Halted/Reset, 1: Running, 2: Paused
 
 
 // Squat parameters
-volatile double lift_period = 3;  //Squat Lift Period
-volatile double h_crouch = 0.20;    // 20cm (Dormant/Loading height)
-volatile double h_stand  = 0.6;    // 45cm (Max Standing height)home position
+volatile float lift_period = 3.0f;  //Squat Lift Period
+volatile float h_crouch = 0.2f;    // 20cm (Dormant/Loading height)
+volatile float h_stand  = 0.6f;    // 45cm (Max Standing height)home position
 
 
 
@@ -1368,14 +1367,14 @@ void signalMotors(float rAngle1, float rAngle2, float rAngle3, float rAngle4, fl
 
 
 
-double AngleH1 = 0;
-double AngleK1 = 0;
-double AngleH2 = 0;
-double AngleK2 = 0;
-double AngleH3 = 0;
-double AngleK3 = 0;
-double AngleH4 = 0;
-double AngleK4 = 0;
+float AngleH1 = 0.0f;
+float AngleK1 = 0.0f;
+float AngleH2 = 0.0f;
+float AngleK2 = 0.0f;
+float AngleH3 = 0.0f;
+float AngleK3 = 0.0f;
+float AngleH4 = 0.0f;
+float AngleK4 = 0.0f;
 
 
 
@@ -1496,7 +1495,7 @@ typedef struct {
 } LegPositions;
 
 // Main function to get all four leg positions
-LegPositions getLegPositions(double t) {
+LegPositions getLegPositions(float t) {
     LegPositions all_pos;
 
 
@@ -1504,10 +1503,10 @@ LegPositions getLegPositions(double t) {
 //	double initial_height = l1 + l2 - 0.2;
 
 	// Phase offsets
-	double ph_LF = 0.00;
-	double ph_RH = 0.25;
-	double ph_RF = 0.50;
-	double ph_LH = 0.75;
+	float ph_LF = 0.00;
+	float ph_RH = 0.25;
+	float ph_RF = 0.50;
+	float ph_LH = 0.75;
 
 
 	// 1. Check for Home/Reset State
@@ -1521,17 +1520,17 @@ LegPositions getLegPositions(double t) {
 
 
 	// 2. --- CALCULATE ACTIVE POSTURE PID OFFSETS ---
-	double delta_y_pitch = 0.0;
-	double delta_y_roll = 0.0;
+	float delta_y_pitch = 0.0f;
+	float delta_y_roll = 0.0f;
 
 	// Calculate PID continuously if we are in a gait that uses it
 	if (gait == 5 || gait == 6) {
-		double dt = t - last_pid_time;
+		float dt = t - last_pid_time;
 		if (dt <= 0.0) dt = 0.001;
 		last_pid_time = t;
 
-		double pitch_error = pitch_deg;
-		double roll_error  = roll_deg;
+		float pitch_error = pitch_deg;
+		float roll_error  = roll_deg;
 
 		P_pitch = Kp_bal_pitch * pitch_error;
 		P_roll  = Kp_bal_roll * roll_error;
@@ -1545,8 +1544,8 @@ LegPositions getLegPositions(double t) {
 		I_pitch = Ki_bal_pitch * pitch_integral;
 		I_roll  = Ki_bal_roll * roll_integral;
 
-		double pitch_deriv = (pitch_error - pitch_prev_error) / dt;
-		double roll_deriv  = (roll_error - roll_prev_error) / dt;
+		float pitch_deriv = (pitch_error - pitch_prev_error) / dt;
+		float roll_deriv  = (roll_error - roll_prev_error) / dt;
 
 		D_pitch = Kd_bal_pitch * (pitch_deriv);
 		D_roll  = Kd_bal_roll * (roll_deriv);
@@ -1638,8 +1637,8 @@ LegPositions getLegPositions(double t) {
 		// --- SATURATION LOGIC ---
 		// Define physical limits based on leg lengths (l1+l2 = 0.71m)
 		// We use 0.60m to keep a safety margin from the singularity.
-		double h_min_limit = 0.10;
-		double h_max_limit = 0.70;
+		float h_min_limit = 0.10;
+		float h_max_limit = 0.70;
 
 		// Apply saturation using fmin/fmax (standard math.h functions)
 		// This ensures the variables stay within [h_min_limit, h_max_limit]
@@ -1651,27 +1650,27 @@ LegPositions getLegPositions(double t) {
 	    // At t=0, cos(0)=1 -> Height = avg + amp = h_stand (Fully Standing)
 	    // At t=5, cos(pi)=-1 -> Height = avg - amp = h_crouch (Starts Low)
 
-	    double amp = (h_stand - h_crouch) / 2.0;
-	    double avg = (h_stand + h_crouch) / 2.0;
-	    double phase = 2.0 * M_PI * (t / lift_period);
+		float amp = (h_stand - h_crouch) / 2.0f;
+		float avg = (h_stand + h_crouch) / 2.0f;
+		float phase = 2.0f * M_PI * (t / lift_period);
 
-	    double current_h = avg + amp * cos(phase);
+		float current_h = avg + amp * cos(phase);
 
 	    // Command all 4 legs to this height (Feet stay at x=0 relative to hip)
-	    all_pos.lf.x = 0.0; all_pos.lf.y = -current_h;
-	    all_pos.rh.x = 0.0; all_pos.rh.y = -current_h;
-	    all_pos.rf.x = 0.0; all_pos.rf.y = -current_h;
-	    all_pos.lh.x = 0.0; all_pos.lh.y = -current_h;
+	    all_pos.lf.x = 0.0f; all_pos.lf.y = -current_h;
+	    all_pos.rh.x = 0.0f; all_pos.rh.y = -current_h;
+	    all_pos.rf.x = 0.0f; all_pos.rf.y = -current_h;
+	    all_pos.lh.x = 0.0f; all_pos.lh.y = -current_h;
 	}
 
 	if (gait == 4) {
 		// Front legs (Targets 22 deg, 122 deg) -> X = -0.210m, Y = -0.273m
-		all_pos.lf.x = -0.210; all_pos.lf.y = -0.273;
-		all_pos.rf.x = -0.210; all_pos.rf.y = -0.273;
+		all_pos.lf.x = -0.210f; all_pos.lf.y = -0.273f;
+		all_pos.rf.x = -0.210f; all_pos.rf.y = -0.273f;
 
 		// Back legs (Targets 36 deg, 125 deg) -> X = 0.138m, Y = -0.297m
-		all_pos.lh.x =  0.138; all_pos.lh.y = -0.297;
-		all_pos.rh.x =  0.138; all_pos.rh.y = -0.297;
+		all_pos.lh.x =  0.138f; all_pos.lh.y = -0.297f;
+		all_pos.rh.x =  0.138f; all_pos.rh.y = -0.297f;
 		return all_pos;
 	}
 

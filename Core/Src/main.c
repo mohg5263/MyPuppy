@@ -502,7 +502,7 @@ static void startReports() {
         sh2_SensorConfig_t config;
     } sensorConfig[] = {
         // Game Rotation Vector, 100Hz
-		{SH2_GAME_ROTATION_VECTOR, {.reportInterval_us = 2500}},
+		{SH2_GAME_ROTATION_VECTOR, {.reportInterval_us = 3000}},
 
     };
 
@@ -934,7 +934,7 @@ static void MX_TIM6_Init(void)
   htim6.Instance = TIM6;
   htim6.Init.Prescaler = 4-1;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 50000-1;
+  htim6.Init.Period = 60000-1;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
   {
@@ -1097,7 +1097,7 @@ void CAN1_Tx_motor_zero(int motor_id) {
 	TxData[7] = 0xFE;
 
 	while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan1) == 0) {
-		HAL_Delay(1);
+//		HAL_Delay(1);
 	}
 
 	if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox) != HAL_OK) {
@@ -1124,7 +1124,7 @@ void CAN1_Tx_motor_off(int motor_id) {
 	TxData[7] = 0xFD;
 
 	while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan1) == 0) {
-		HAL_Delay(1);
+//		HAL_Delay(1);
 	}
 
 	if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox) != HAL_OK) {
@@ -1172,7 +1172,7 @@ void CAN1_Tx_send_to_motor(int motor_id, float pos, float vel, float kp,
 
 
 	while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan1) == 0) {
-		HAL_Delay(1);
+//		HAL_Delay(1);
 	}
 
 	if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox) != HAL_OK) {

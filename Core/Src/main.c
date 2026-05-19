@@ -658,10 +658,10 @@ int main(void)
 
 
 
-	  if (update_control_params) {
-	      updateControlParameters();
-	      update_control_params = 0;
-	  }
+//	  if (update_control_params) {
+//	      updateControlParameters();
+//	      update_control_params = 0;
+//	  }
 
       if (resetOccurred) {
           resetOccurred = false;
@@ -1372,7 +1372,8 @@ float AngleK4 = 0.0f;
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim->Instance == TIM6) {
-		update_control_params = 1;
+		updateControlParameters();
+		//update_control_params = 1;
 		update_button = 1;
     }if (htim->Instance == TIM2) {
         timer_overflows++;
@@ -1541,7 +1542,6 @@ LegPositions getLegPositions(float t) {
 
 		//		D_pitch = Kd_bal_pitch * (-gyro_pitch_rate);
 		//		D_roll  = Kd_bal_roll * (-gyro_roll_rate);
-
 		pitch_prev_error = pitch_error;
 		roll_prev_error  = roll_error;
 

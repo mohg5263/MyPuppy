@@ -164,15 +164,6 @@ float Ki_bal_roll = 0.001f; // Integral: Removes steady-state offset (start at 0
 float Kp_bal_roll = 0.007f; // Proportional: Drives error to zero
 
 
-float P_pitch =0.0f;
-float I_pitch =0.0f;
-float D_pitch =0.0f;
-
-
-float P_roll = 0.0f;
-float I_roll = 0.f;
-float D_roll = 0.f;
-
 
 // State Tracking
 float pitch_integral = 0.0f, roll_integral = 0.0f;
@@ -1516,8 +1507,8 @@ LegPositions getLegPositions(float t) {
 		float pitch_error = pitch_deg;
 		float roll_error  = roll_deg;
 
-		P_pitch = Kp_bal_pitch * pitch_error;
-		P_roll  = Kp_bal_roll * roll_error;
+		float P_pitch = Kp_bal_pitch * pitch_error;
+		float P_roll  = Kp_bal_roll * roll_error;
 
 		pitch_integral += pitch_error * dt;
 		roll_integral  += roll_error * dt;
@@ -1525,14 +1516,14 @@ LegPositions getLegPositions(float t) {
 		pitch_integral = saturate(pitch_integral, -50.0, 50.0);
 		roll_integral  = saturate(roll_integral, -50.0, 50.0);
 
-		I_pitch = Ki_bal_pitch * pitch_integral;
-		I_roll  = Ki_bal_roll * roll_integral;
+		float I_pitch = Ki_bal_pitch * pitch_integral;
+		float I_roll  = Ki_bal_roll * roll_integral;
 
 		float pitch_deriv = (pitch_error - pitch_prev_error) / dt;
 		float roll_deriv  = (roll_error - roll_prev_error) / dt;
 
-		D_pitch = Kd_bal_pitch * (pitch_deriv);
-		D_roll  = Kd_bal_roll * (roll_deriv);
+		float D_pitch = Kd_bal_pitch * (pitch_deriv);
+		float D_roll  = Kd_bal_roll * (roll_deriv);
 
 		//		D_pitch = Kd_bal_pitch * (-gyro_pitch_rate);
 		//		D_roll  = Kd_bal_roll * (-gyro_roll_rate);

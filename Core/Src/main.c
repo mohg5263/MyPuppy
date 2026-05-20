@@ -657,12 +657,6 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
 
-
-//	  if (update_control_params) {
-//	      updateControlParameters();
-//	      update_control_params = 0;
-//	  }
-
       if (resetOccurred) {
           resetOccurred = false;
           startReports();
@@ -1373,8 +1367,6 @@ float AngleK4 = 0.0f;
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim->Instance == TIM6) {
 		updateControlParameters();
-		//update_control_params = 1;
-		update_button = 1;
     }if (htim->Instance == TIM2) {
         timer_overflows++;
     }if (htim->Instance == TIM3) {
@@ -1443,7 +1435,7 @@ typedef struct {
 } LegPosition;
 
 // Function to compute the x and y coordinates for a single leg
-LegPosition leg_xy(float t, float T, float beta, float L, float H, float phaseFrac) {
+LegPosition leg_xy(float t, float T, float beta, float L, float H, float phaseFrac, float pid_offset_y) {
     LegPosition pos;
 
     float offset = phaseFrac * T;
@@ -1456,19 +1448,21 @@ LegPosition leg_xy(float t, float T, float beta, float L, float H, float phaseFr
     float v = L / (beta * T);
 
     if (local_t < beta * T) {
-        // Stance phase
+        // Stance phase: The foot is on the ground.
         pos.x = L / 2.0f - v * local_t;
-        pos.y = -initial_height;
+        // Apply the active PID stabilization offset here
+        pos.y = -initial_height + pid_offset_y;
     } else {
-        // Swing phase
+        // Swing phase: The foot is in the air.
         float tau = (local_t - beta * T) / ((1.0f - beta) * T);
-        float tau_sq = tau * tau;   // REPLACES pow(tau, 2)
-        float tau_cub = tau_sq * tau; // REPLACES pow(tau, 3)
+        float tau_sq = tau * tau;
+        float tau_cub = tau_sq * tau;
 
         pos.x = -L / 2.0f - v * tau + 3.0f * (L + v) * tau_sq - 2.0f * (L + v) * tau_cub;
 
-        float s = sinf(M_PI * tau); // REPLACES double sin()
-        pos.y = -initial_height + H * (s * s); // REPLACES pow(sin, 2)
+        float s = sinf(M_PI * tau);
+        // Do NOT apply PID offsets here. Let the foot clear the ground naturally.
+        pos.y = -initial_height + H * (s * s);
     }
     return pos;
 }
@@ -1578,32 +1572,45 @@ LegPositions getLegPositions(float t) {
 
 	// 2. Calculate Raw Leg Positions (Local Trajectories)
 	if (gait == 6) { // Walk with stabilization
-		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
-		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RH);
-		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
-		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH);
+		// A. Pre-calculate the localized offset for each leg
+		float offset_lf =  delta_y_pitch - delta_y_roll;
+		float offset_rf =  delta_y_pitch + delta_y_roll;
+		float offset_lh = -delta_y_pitch - delta_y_roll;
+		float offset_rh = -delta_y_pitch + delta_y_roll;
 
-		// B. Superimpose the PID Posture offsets onto the Y coordinates
-		all_pos.lf.y += (delta_y_pitch - delta_y_roll);
-		all_pos.rf.y += (delta_y_pitch + delta_y_roll);
-		all_pos.lh.y += (-delta_y_pitch - delta_y_roll);
-		all_pos.rh.y += (-delta_y_pitch + delta_y_roll);
+		// B. Pass the offsets directly into the trajectory generator
+		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF, offset_lf);
+		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RH, offset_rh);
+		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF, offset_rf);
+		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH, offset_lh);
+
+
+//		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
+//		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RH);
+//		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
+//		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH);
+//
+//		// B. Superimpose the PID Posture offsets onto the Y coordinates
+//		all_pos.lf.y += (delta_y_pitch - delta_y_roll);
+//		all_pos.rf.y += (delta_y_pitch + delta_y_roll);
+//		all_pos.lh.y += (-delta_y_pitch - delta_y_roll);
+//		all_pos.rh.y += (-delta_y_pitch + delta_y_roll);
 	}
 
 
 
 	// 2. Calculate Raw Leg Positions (Local Trajectories)
 	if (gait == 1) { // Walk
-		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
-		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RH);
-		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
-		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH);
+		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF, 0.0f);
+		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RH, 0.0f);
+		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF, 0.0f);
+		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH, 0.0f);
 	}
 	if (gait == -1) { // Walk backward
-		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LH);
-		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RF);
-		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RH);
-		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LF);
+		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LH, 0.0f);
+		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RF, 0.0f);
+		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RH, 0.0f);
+		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LF, 0.0f);
 
 //		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
 //		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RH);
@@ -1616,10 +1623,10 @@ LegPositions getLegPositions(float t) {
 		all_pos.lh.x = -all_pos.lh.x;
 	}
 	if (gait == 2) { // Trot
-		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
-		all_pos.rh = leg_xy(t, T, beta, L, H, ph_LF);
-		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
-		all_pos.lh = leg_xy(t, T, beta, L, H, ph_RF);
+		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF, 0.0f);
+		all_pos.rh = leg_xy(t, T, beta, L, H, ph_LF, 0.0f);
+		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF, 0.0f);
+		all_pos.lh = leg_xy(t, T, beta, L, H, ph_RF, 0.0f);
 	}
 	if (gait == 3) { //  Heavy Lift Squat Test
 

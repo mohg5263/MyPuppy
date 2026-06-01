@@ -174,6 +174,26 @@ float last_pid_time = 0.0f;
 float MAX_COMPENSATION = 0.1f; // Max 10cm adjustment per leg
 
 
+
+
+
+
+// --- Yaw Filtering & Correction ---
+float filtered_yaw = 0.0f;
+float target_yaw = 0.0f;     // The heading we want to maintain
+
+
+
+float alpha_yaw = 0.005f;     // Tuning parameter: start at 0.05. Lower is smoother.
+float Kp_yaw = 0.01f;       // Proportional gain (keep this low so it corrects gently)
+float delta_L_cm = 0.0f;
+
+
+
+
+
+
+
 sh2_ProductIds_t prodIds;
 sh2_Hal_t *pSh2Hal = 0;
 bool resetOccurred = false;
@@ -1484,6 +1504,20 @@ LegPositions getLegPositions(float t) {
 	float ph_LH = 0.75;
 
 
+
+	//1. FILTER THE RAW YAW ---
+	// Update the filtered_yaw using the Exponential Moving Average formula
+	filtered_yaw = (alpha_yaw * yaw_deg) + ((1.0f - alpha_yaw) * filtered_yaw);
+
+	// --- 2. CALCULATE CORRECTION ---
+	// Use the SMOOTHED yaw to find the error
+	float yaw_error = target_yaw - filtered_yaw;
+
+	// Calculate the stride adjustment
+	float delta_L = Kp_yaw * yaw_error;
+	delta_L_cm = delta_L * 100;
+
+
 	// 1. Check for Home/Reset State
 	if (t <= 2.0 || gait == 0) {
 		all_pos.lf.x = 0.0; all_pos.lf.y = -initial_height;
@@ -1576,17 +1610,28 @@ LegPositions getLegPositions(float t) {
 		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH, offset_lh);
 
 
-//		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
-//		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RH);
-//		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
-//		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH);
-//
-//		// B. Superimpose the PID Posture offsets onto the Y coordinates
-//		all_pos.lf.y += (delta_y_pitch - delta_y_roll);
-//		all_pos.rf.y += (delta_y_pitch + delta_y_roll);
-//		all_pos.lh.y += (-delta_y_pitch - delta_y_roll);
-//		all_pos.rh.y += (-delta_y_pitch + delta_y_roll);
 	}
+
+	// 2. Calculate Raw Leg Positions (Local Trajectories)
+		if (gait == 7) { // Walk
+
+
+
+//			// Saturate for safety
+//			float max_delta_L = 0.07f;   // Max allowable stride change (in meters)
+//			delta_L = saturate(delta_L, -max_delta_L, max_delta_L);
+
+			// Calculate independent left and right stride lengths
+			float L_left = L - delta_L;
+			float L_right = L + delta_L;
+
+			// Feed the modified stride lengths to the respective legs
+			all_pos.lf = leg_xy(t, T, beta, L_left, H, ph_LF, 0.0f);
+			all_pos.lh = leg_xy(t, T, beta, L_left, H, ph_LH, 0.0f);
+
+			all_pos.rf = leg_xy(t, T, beta, L_right, H, ph_RF, 0.0f);
+			all_pos.rh = leg_xy(t, T, beta, L_right, H, ph_RH, 0.0f);
+		}
 
 
 
@@ -1603,10 +1648,6 @@ LegPositions getLegPositions(float t) {
 		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RH, 0.0f);
 		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LF, 0.0f);
 
-//		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
-//		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RH);
-//		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
-//		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH);
 
 		all_pos.lf.x = -all_pos.lf.x;
 		all_pos.rh.x = -all_pos.rh.x;

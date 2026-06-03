@@ -1241,50 +1241,50 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
         // Convert and update the correct global variable based on the motor's ID
         switch (id) {
             case 1:
-        		position_1 = p * 180.0 / M_PI / 80 * 15 + 22;
+        		position_1 = p * 180.0 / M_PI / 80 * 15;
         		velocity_1 = v;
         		torque_1 = i;
         		temp_1 = T - 40;
 
                 break;
             case 2:
-        		position_2 = -p * 180.0 / M_PI / 80 * 15 - 122;
+        		position_2 = -p * 180.0 / M_PI / 80 * 15;
         		velocity_2 = v;
         		torque_2 = i;
         		temp_2 = T - 40;
                 break;
             case 3:
-        		position_3 = p * 180.0 / M_PI / 80 * 15 - 22;
+        		position_3 = p * 180.0 / M_PI / 80 * 15;
         		velocity_3 = v;
         		torque_3 = i;
         		temp_3 = T - 40;
                 break;
             case 4:
-        		position_4 = -p * 180.0 / M_PI / 80 * 15 + 122;
+        		position_4 = -p * 180.0 / M_PI / 80 * 15;
         		velocity_4 = v;
         		torque_4 = i;
         		temp_4 = T - 40;
                 break;
             case 5:
-        		position_5 = p * 180.0 / M_PI / 65 * 12 - 36;
+        		position_5 = p * 180.0 / M_PI / 65 * 12;
         		velocity_5 = v;
         		torque_5 = i;
         		temp_5 = T - 40;
                 break;
             case 6:
-        		position_6 = -p * 180.0 / M_PI / 65 * 12 + 125;
+        		position_6 = -p * 180.0 / M_PI / 65 * 12;
         		velocity_6 = v;
         		torque_6 = i;
         		temp_6 = T - 40;
                 break;
             case 7:
-        		position_7 = p * 180.0 / M_PI / 65 * 12 + 36;
+        		position_7 = p * 180.0 / M_PI / 65 * 12;
         		velocity_7 = v;
         		torque_7 = i;
         		temp_7 = T - 40;
                 break;
             case 8:
-        		position_8 = -p * 180.0 / M_PI / 65 * 12 - 125;
+        		position_8 = -p * 180.0 / M_PI / 65 * 12;
         		velocity_8 = v;
         		torque_8 = i;
         		temp_8 = T - 40;
@@ -1533,7 +1533,7 @@ LegPositions getLegPositions(float t) {
 	float delta_y_roll = 0.0f;
 
 	// Calculate PID continuously if we are in a gait that uses it
-	if (gait == 5 || gait == 6) {
+	if (gait == 5) {
 		float dt = t - last_pid_time;
 		if (dt <= 0.0) dt = 0.001;
 		last_pid_time = t;
@@ -1569,57 +1569,35 @@ LegPositions getLegPositions(float t) {
 
 		delta_y_pitch = saturate(delta_y_pitch, -MAX_COMPENSATION, MAX_COMPENSATION);
 		delta_y_roll  = saturate(delta_y_roll, -MAX_COMPENSATION, MAX_COMPENSATION);
-	}
 
 
+		// Apply Offsets to Legs (Y is negative going down)
+		// Front Left (LF)
+		all_pos.lf.x = 0.0;
+		all_pos.lf.y = -initial_height + delta_y_pitch - delta_y_roll;
 
+		// Right Front (RF)
+		all_pos.rf.x = 0.0;
+		all_pos.rf.y = -initial_height + delta_y_pitch + delta_y_roll;
 
-	if (gait == 5) { // Active PID Posture Balancing
+		// Left Hind (LH)
+		all_pos.lh.x = 0.0;
+		all_pos.lh.y = -initial_height - delta_y_pitch - delta_y_roll;
 
-			// Apply Offsets to Legs (Y is negative going down)
-			// Front Left (LF)
-			all_pos.lf.x = 0.0;
-			all_pos.lf.y = -initial_height + delta_y_pitch - delta_y_roll;
-
-			// Right Front (RF)
-			all_pos.rf.x = 0.0;
-			all_pos.rf.y = -initial_height + delta_y_pitch + delta_y_roll;
-
-			// Left Hind (LH)
-			all_pos.lh.x = 0.0;
-			all_pos.lh.y = -initial_height - delta_y_pitch - delta_y_roll;
-
-			// Right Hind (RH)
-			all_pos.rh.x = 0.0;
-			all_pos.rh.y = -initial_height - delta_y_pitch + delta_y_roll;
+		// Right Hind (RH)
+		all_pos.rh.x = 0.0;
+		all_pos.rh.y = -initial_height - delta_y_pitch + delta_y_roll;
 		}
 
 
-	// 2. Calculate Raw Leg Positions (Local Trajectories)
-	if (gait == 6) { // Walk with stabilization
-		// A. Pre-calculate the localized offset for each leg
-		float offset_lf =  delta_y_pitch - delta_y_roll;
-		float offset_rf =  delta_y_pitch + delta_y_roll;
-		float offset_lh = -delta_y_pitch - delta_y_roll;
-		float offset_rh = -delta_y_pitch + delta_y_roll;
 
-		// B. Pass the offsets directly into the trajectory generator
-		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF, offset_lf);
-		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RH, offset_rh);
-		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF, offset_rf);
-		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH, offset_lh);
-
-
-	}
 
 	// 2. Calculate Raw Leg Positions (Local Trajectories)
-		if (gait == 7) { // Walk
+		if (gait == 6) { // Walk
 
-
-
-//			// Saturate for safety
-//			float max_delta_L = 0.07f;   // Max allowable stride change (in meters)
-//			delta_L = saturate(delta_L, -max_delta_L, max_delta_L);
+			// Saturate for safety
+			float max_delta_L = 0.2f;   // Max allowable stride change (in meters)
+			delta_L = saturate(delta_L, -max_delta_L, max_delta_L);
 
 			// Calculate independent left and right stride lengths
 			float L_left = L - delta_L;

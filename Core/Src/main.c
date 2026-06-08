@@ -29,6 +29,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <stdbool.h>
+#include "dataAcq.h"
 
 
 
@@ -50,6 +51,15 @@ volatile uint8_t msg_ready = 0;
 volatile uint8_t update_control_params = 0;
 volatile uint8_t update_button=0;
 volatile char uart_msg_buffer[50];
+
+
+
+
+
+
+
+
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -673,6 +683,7 @@ int main(void)
           startReports();
       }
       sh2_service();
+      DumpTrace();
   }
 
 
@@ -1786,6 +1797,10 @@ void updateControlParameters() {
 
 
 	signalMotors(rAngle1, rAngle2, rAngle3, rAngle4, rAngle5, rAngle6, rAngle7, rAngle8);
+
+
+
+
 
 
 

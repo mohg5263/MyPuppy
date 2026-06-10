@@ -29,7 +29,6 @@
 #include <stdint.h>
 #include <math.h>
 #include <stdbool.h>
-#include "dataAcq.h"
 
 
 
@@ -51,15 +50,6 @@ volatile uint8_t msg_ready = 0;
 volatile uint8_t update_control_params = 0;
 volatile uint8_t update_button=0;
 volatile char uart_msg_buffer[50];
-
-
-
-
-
-
-
-
-
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -199,8 +189,21 @@ float Kp_yaw = 0.01f;       // Proportional gain (keep this low so it corrects g
 float delta_L_cm = 0.0f;
 
 
+// --- Feedforward Variables ---
+// 60 lbs (robot) + 20 lbs (payload) = 80 lbs total.
+// 80 lbs = 36.3 kg. Total Force = 36.3 * 9.81 = 356 Newtons.
+// Force per leg = 356 / 4 = 89 Newtons.
+volatile float added_weight = -60.0f;
+
+float last_ff_time = 0.0f;
+
+// To store previous positions for velocity calculation
+float prev_rA1=0, prev_rA2=0, prev_rA3=0, prev_rA4=0;
+float prev_rA5=0, prev_rA6=0, prev_rA7=0, prev_rA8=0;
 
 
+volatile float m_t1 = 0, m_t2 = 0, m_t3 = 0, m_t4 = 0, m_t5 = 0, m_t6 = 0, m_t7 = 0, m_t8 = 0;
+volatile float v1 = 0, v2 = 0, v3 = 0, v4 = 0, v5 = 0, v6 = 0, v7 = 0, v8 = 0;
 
 
 
@@ -241,75 +244,15 @@ uint32_t TxMailbox;	//data type dictated by HAL
 
 
 
-//Receiving parameter variables
-//for motor 1
-float position_1 = 0;
-float velocity_1 = 0;
-float torque_1 = 0;
-float temp_1 = 0;
-//for motor 2
-float position_2 = 0;
-float velocity_2 = 0;
-float torque_2 = 0;
-float temp_2 = 0;
-//for motor 3
-float position_3 = 0;
-float velocity_3 = 0;
-float torque_3 = 0;
-float temp_3 = 0;
-//for motor 4
-float position_4 = 0;
-float velocity_4 = 0;
-float torque_4 = 0;
-float temp_4 = 0;
-//for motor 5
-float position_5 = 0;
-float velocity_5 = 0;
-float torque_5 = 0;
-float temp_5 = 0;
-//for motor 6
-float position_6 = 0;
-float velocity_6 = 0;
-float torque_6 = 0;
-float temp_6 = 0;
-//for motor 7
-float position_7 = 0;
-float velocity_7 = 0;
-float torque_7 = 0;
-float temp_7 = 0;
-//for motor 8
-float position_8 = 0;
-float velocity_8 = 0;
-float torque_8 = 0;
-float temp_8 = 0;
+// Receiving parameter variables
+float position_1 = 0, position_2 = 0, position_3 = 0, position_4 = 0, position_5 = 0, position_6 = 0, position_7 = 0, position_8 = 0;
+float velocity_1 = 0, velocity_2 = 0, velocity_3 = 0, velocity_4 = 0, velocity_5 = 0, velocity_6 = 0, velocity_7 = 0, velocity_8 = 0;
+float torque_1 = 0, torque_2 = 0, torque_3 = 0, torque_4 = 0, torque_5 = 0, torque_6 = 0, torque_7 = 0, torque_8 = 0;
+float temp_1 = 0, temp_2 = 0, temp_3 = 0, temp_4 = 0, temp_5 = 0, temp_6 = 0, temp_7 = 0, temp_8 = 0;
 
-float wPos1 = 0;
-float wPos2 = 0;
-float wPos3 = 0;
-float wPos4 = 0;
-float wPos5 = 0;
-float wPos6 = 0;
-float wPos7 = 0;
-float wPos8 = 0;
-
-float posF1 = 0;
-float posF2 = 0;
-float posF3 = 0;
-float posF4 = 0;
-float posF5 = 0;
-float posF6 = 0;
-float posF7 = 0;
-float posF8 = 0;
-
-
-float rAngle1=0;
-float rAngle2=0;
-float rAngle3=0;
-float rAngle4=0;
-float rAngle5=0;
-float rAngle6=0;
-float rAngle7=0;
-float rAngle8=0;
+float wPos1 = 0, wPos2 = 0, wPos3 = 0, wPos4 = 0, wPos5 = 0, wPos6 = 0, wPos7 = 0, wPos8 = 0;
+float posF1 = 0, posF2 = 0, posF3 = 0, posF4 = 0, posF5 = 0, posF6 = 0, posF7 = 0, posF8 = 0;
+float rAngle1 = 0, rAngle2 = 0, rAngle3 = 0, rAngle4 = 0, rAngle5 = 0, rAngle6 = 0, rAngle7 = 0, rAngle8 = 0;
 
 
 
@@ -458,11 +401,11 @@ float H = 0.15f;
 
 
 
-float Kp_H=4.0f;
-float Kd_H=0.3f;
+float Kp_H=6.0f;
+float Kd_H=0.8f;
 
-float Kp_K=4.0f;
-float Kd_K=0.3f;
+float Kp_K=6.0f;
+float Kd_K=0.8f;
 
 
 // Gait selection
@@ -683,7 +626,6 @@ int main(void)
           startReports();
       }
       sh2_service();
-      DumpTrace();
   }
 
 
@@ -1308,65 +1250,95 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
 
 
 
+void signalMotors(float rAngle1, float rAngle2, float rAngle3, float rAngle4, float rAngle5, float rAngle6, float rAngle7, float rAngle8,
+                  float v1, float v2, float v3, float v4, float v5, float v6, float v7, float v8,
+                  float t1, float t2, float t3, float t4, float t5, float t6, float t7, float t8){
 
+	if (motorActivated1) CAN1_Tx_send_to_motor(motorID1, rAngle1, v1, Kp_H, Kd_H, t1);
+	else CAN1_Tx_send_to_motor(motorID1, 0, 0, 0, 0, 0);
 
-void signalMotors(float rAngle1, float rAngle2, float rAngle3, float rAngle4, float rAngle5, float rAngle6, float rAngle7, float rAngle8){
+	if (motorActivated2) CAN1_Tx_send_to_motor(motorID2, -rAngle2, -v2, Kp_K, Kd_K, -t2);
+	else CAN1_Tx_send_to_motor(motorID2, 0, 0, 0, 0, 0);
 
+	if (motorActivated3) CAN1_Tx_send_to_motor(motorID3, rAngle3, v3, Kp_H, Kd_H, t3);
+	else CAN1_Tx_send_to_motor(motorID3, 0, 0, 0, 0, 0);
 
-	if (motorActivated1) {
-		CAN1_Tx_send_to_motor(motorID1, rAngle1, 0, Kp_H, Kd_H, 0);
-	} else {
-		CAN1_Tx_send_to_motor(motorID1, 0, 0, 0, 0, 0);
-	}
+	if (motorActivated4) CAN1_Tx_send_to_motor(motorID4, -rAngle4, -v4, Kp_K, Kd_K, -t4);
+	else CAN1_Tx_send_to_motor(motorID4, 0, 0, 0, 0, 0);
 
+	if (motorActivated5) CAN1_Tx_send_to_motor(motorID5, rAngle5, v5, Kp_H, Kd_H, t5);
+	else CAN1_Tx_send_to_motor(motorID5, 0, 0, 0, 0, 0);
 
-	if (motorActivated2) {
-		CAN1_Tx_send_to_motor(motorID2, -rAngle2, 0, Kp_K, Kd_K, 0);
-	} else {
-		CAN1_Tx_send_to_motor(motorID2, 0, 0, 0, 0, 0);
-	}
+	if (motorActivated6) CAN1_Tx_send_to_motor(motorID6, -rAngle6, -v6, Kp_K, Kd_K, -t6);
+	else CAN1_Tx_send_to_motor(motorID6, 0, 0, 0, 0, 0);
 
+	if (motorActivated7) CAN1_Tx_send_to_motor(motorID7, rAngle7, v7, Kp_H, Kd_H, t7);
+	else CAN1_Tx_send_to_motor(motorID7, 0, 0, 0, 0, 0);
 
-	if (motorActivated3) {
-		CAN1_Tx_send_to_motor(motorID3, rAngle3, 0, Kp_H, Kd_H, 0);
-	} else {
-		CAN1_Tx_send_to_motor(motorID3, 0, 0, 0, 0, 0);
-	}
-
-
-	if (motorActivated4) {
-		CAN1_Tx_send_to_motor(motorID4, -rAngle4, 0, Kp_K, Kd_K, 0);
-	} else {
-		CAN1_Tx_send_to_motor(motorID4, 0, 0, 0, 0, 0);
-	}
-
-
-	if (motorActivated5) {
-		CAN1_Tx_send_to_motor(motorID5, rAngle5, 0, Kp_H, Kd_H, 0);
-	} else {
-		CAN1_Tx_send_to_motor(motorID5, 0, 0, 0, 0, 0);
-	}
-
-	if (motorActivated6) {
-		CAN1_Tx_send_to_motor(motorID6, -rAngle6, 0, Kp_K, Kd_K, 0);
-	} else {
-		CAN1_Tx_send_to_motor(motorID6, 0, 0, 0, 0, 0);
-	}
-
-
-	if (motorActivated7) {
-		CAN1_Tx_send_to_motor(motorID7, rAngle7, 0, Kp_H, Kd_H, 0);
-	} else {
-		CAN1_Tx_send_to_motor(motorID7, 0, 0, 0, 0, 0);
-	}
-
-	if (motorActivated8) {
-		CAN1_Tx_send_to_motor(motorID8, -rAngle8, 0, Kp_K, Kd_K, 0);
-	} else {
-		CAN1_Tx_send_to_motor(motorID8, 0, 0, 0, 0, 0);
-	}
-
+	if (motorActivated8) CAN1_Tx_send_to_motor(motorID8, -rAngle8, -v8, Kp_K, Kd_K, -t8);
+	else CAN1_Tx_send_to_motor(motorID8, 0, 0, 0, 0, 0);
 }
+
+
+
+
+//void signalMotors(float rAngle1, float rAngle2, float rAngle3, float rAngle4, float rAngle5, float rAngle6, float rAngle7, float rAngle8){
+//
+//
+//	if (motorActivated1) {
+//		CAN1_Tx_send_to_motor(motorID1, rAngle1, 0, Kp_H, Kd_H, 0);
+//	} else {
+//		CAN1_Tx_send_to_motor(motorID1, 0, 0, 0, 0, 0);
+//	}
+//
+//
+//	if (motorActivated2) {
+//		CAN1_Tx_send_to_motor(motorID2, -rAngle2, 0, Kp_K, Kd_K, 0);
+//	} else {
+//		CAN1_Tx_send_to_motor(motorID2, 0, 0, 0, 0, 0);
+//	}
+//
+//
+//	if (motorActivated3) {
+//		CAN1_Tx_send_to_motor(motorID3, rAngle3, 0, Kp_H, Kd_H, 0);
+//	} else {
+//		CAN1_Tx_send_to_motor(motorID3, 0, 0, 0, 0, 0);
+//	}
+//
+//
+//	if (motorActivated4) {
+//		CAN1_Tx_send_to_motor(motorID4, -rAngle4, 0, Kp_K, Kd_K, 0);
+//	} else {
+//		CAN1_Tx_send_to_motor(motorID4, 0, 0, 0, 0, 0);
+//	}
+//
+//
+//	if (motorActivated5) {
+//		CAN1_Tx_send_to_motor(motorID5, rAngle5, 0, Kp_H, Kd_H, 0);
+//	} else {
+//		CAN1_Tx_send_to_motor(motorID5, 0, 0, 0, 0, 0);
+//	}
+//
+//	if (motorActivated6) {
+//		CAN1_Tx_send_to_motor(motorID6, -rAngle6, 0, Kp_K, Kd_K, 0);
+//	} else {
+//		CAN1_Tx_send_to_motor(motorID6, 0, 0, 0, 0, 0);
+//	}
+//
+//
+//	if (motorActivated7) {
+//		CAN1_Tx_send_to_motor(motorID7, rAngle7, 0, Kp_H, Kd_H, 0);
+//	} else {
+//		CAN1_Tx_send_to_motor(motorID7, 0, 0, 0, 0, 0);
+//	}
+//
+//	if (motorActivated8) {
+//		CAN1_Tx_send_to_motor(motorID8, -rAngle8, 0, Kp_K, Kd_K, 0);
+//	} else {
+//		CAN1_Tx_send_to_motor(motorID8, 0, 0, 0, 0, 0);
+//	}
+//
+//}
 
 
 
@@ -1796,24 +1768,75 @@ void updateControlParameters() {
 
 
 
-	signalMotors(rAngle1, rAngle2, rAngle3, rAngle4, rAngle5, rAngle6, rAngle7, rAngle8);
+	// --- 1. CALCULATE TIME STEP (dt) ---
+	float current_time = seconds_elapsed;
+	float dt = current_time - last_ff_time;
+	if (dt <= 0.0001f) dt = 0.001f; // Prevent division by zero
+	last_ff_time = current_time;
+
+
+	// --- 2. VELOCITY FEEDFORWARD (Numerical Derivative) ---
+	// Calculates how fast the motor commands are changing
+	v1 = (rAngle1 - prev_rA1) / dt;
+	v2 = (rAngle2 - prev_rA2) / dt;
+	v3 = (rAngle3 - prev_rA3) / dt;
+	v4 = (rAngle4 - prev_rA4) / dt;
+	v5 = (rAngle5 - prev_rA5) / dt;
+	v6 = (rAngle6 - prev_rA6) / dt;
+	v7 = (rAngle7 - prev_rA7) / dt;
+	v8 = (rAngle8 - prev_rA8) / dt;
+
+	// Save current angles for the next loop
+	prev_rA1 = rAngle1; prev_rA2 = rAngle2; prev_rA3 = rAngle3; prev_rA4 = rAngle4;
+	prev_rA5 = rAngle5; prev_rA6 = rAngle6; prev_rA7 = rAngle7; prev_rA8 = rAngle8;
+
+
+	// --- 3. GRAVITY/TORQUE FEEDFORWARD (Jacobian) ---
+	// Calculate physical joint torques required to support the weight (F_y)
+	// Equation: Tau = J^T * F
+	float F_y_per_leg = -(60.0f + added_weight) * 0.453f * 9.81f / 4.0f;
+
+	float t_hip1  = F_y_per_leg * (l1 * sinf(sol1.theta1) + l2 * sinf(sol1.theta1 + sol1.theta2));
+	float t_knee1 = F_y_per_leg * (l2 * sinf(sol1.theta1 + sol1.theta2));
+
+	float t_hip2  = F_y_per_leg * (l1 * sinf(sol2.theta1) + l2 * sinf(sol2.theta1 + sol2.theta2));
+	float t_knee2 = F_y_per_leg * (l2 * sinf(sol2.theta1 + sol2.theta2));
+
+	float t_hip3  = F_y_per_leg * (l1 * sinf(sol3.theta1) + l2 * sinf(sol3.theta1 + sol3.theta2));
+	float t_knee3 = F_y_per_leg * (l2 * sinf(sol3.theta1 + sol3.theta2));
+
+	float t_hip4  = F_y_per_leg * (l1 * sinf(sol4.theta1) + l2 * sinf(sol4.theta1 + sol4.theta2));
+	float t_knee4 = F_y_per_leg * (l2 * sinf(sol4.theta1 + sol4.theta2));
+
+
+	// --- 4. CONVERT JOINT TORQUE TO MOTOR TORQUE ---
+	// Motor torque = Joint torque / Gear Ratio
+	float gr_front = 80.0f / 15.0f; // Front belt ratio
+	float gr_back  = 65.0f / 12.0f; // Back belt ratio
+
+	m_t1 = t_hip1 / gr_front;
+	m_t2 = t_knee1 / gr_front;
+	m_t3 = t_hip2 / gr_front;
+	m_t4 = t_knee2 / gr_front;
+
+	m_t5 = t_hip3 / gr_back;
+	m_t6 = t_knee3 / gr_back;
+	m_t7 = t_hip4 / gr_back;
+	m_t8 = t_knee4 / gr_back;
 
 
 
 
+
+	// --- 5. SEND ALL DATA TO MOTORS ---
+	signalMotors(rAngle1, rAngle2, rAngle3, rAngle4, rAngle5, rAngle6, rAngle7, rAngle8,
+				 v1, v2, v3, v4, v5, v6, v7, v8,
+				 m_t1, m_t2, m_t3, m_t4, m_t5, m_t6, m_t7, m_t8);
 
 
 
     HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_4);
 }
-
-
-
-
-
-
-
-
 
 
 

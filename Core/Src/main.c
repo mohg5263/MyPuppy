@@ -1575,7 +1575,7 @@ LegPositions getLegPositions(float t) {
 
 
 
-	// 2. Calculate Raw Leg Positions (Local Trajectories)
+	// FORWARD WALK WITH YAW CORRETION
 		if (gait == 6) { // Walk
 
 			// Saturate for safety
@@ -1592,6 +1592,34 @@ LegPositions getLegPositions(float t) {
 
 			all_pos.rf = leg_xy(t, T, beta, L_right, H, ph_RF, 0.0f);
 			all_pos.rh = leg_xy(t, T, beta, L_right, H, ph_RH, 0.0f);
+		}
+
+
+		// BACKWARD WALK WITH YAW CORRECTION
+		if (gait == -6) { // Walk backward with yaw correction
+
+			// Saturate for safety
+			float max_delta_L = 0.2f;   // Max allowable stride change (in meters)
+			delta_L = saturate(delta_L, -max_delta_L, max_delta_L);
+
+			// Calculate independent left and right stride lengths
+			// NOTE: delta_L application is inverted (+ for left, - for right)
+			// compared to forward walking. Steering backward requires the opposite
+			// stride bias to correct the nose heading in the same direction.
+			float L_left = L + delta_L;
+			float L_right = L - delta_L;
+
+			// Feed the modified stride lengths and reversed phases (from gait -1)
+			all_pos.lf = leg_xy(t, T, beta, L_left, H, ph_LH, 0.0f);
+			all_pos.rh = leg_xy(t, T, beta, L_right, H, ph_RF, 0.0f);
+			all_pos.rf = leg_xy(t, T, beta, L_right, H, ph_RH, 0.0f);
+			all_pos.lh = leg_xy(t, T, beta, L_left, H, ph_LF, 0.0f);
+
+			// Invert the x-axis to physically move backward (from gait -1)
+			all_pos.lf.x = -all_pos.lf.x;
+			all_pos.rh.x = -all_pos.rh.x;
+			all_pos.rf.x = -all_pos.rf.x;
+			all_pos.lh.x = -all_pos.lh.x;
 		}
 
 

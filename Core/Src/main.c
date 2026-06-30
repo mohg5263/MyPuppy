@@ -193,7 +193,7 @@ float delta_L_cm = 0.0f;
 // 60 lbs (robot) + 20 lbs (payload) = 80 lbs total.
 // 80 lbs = 36.3 kg. Total Force = 36.3 * 9.81 = 356 Newtons.
 // Force per leg = 356 / 4 = 89 Newtons.
-volatile float added_weight = -60.0f;
+volatile float added_weight = 20.0f;
 
 float last_ff_time = 0.0f;
 
@@ -382,8 +382,8 @@ float ttime2 = 0.0f;
 
 
 // Global constants for link lengths
-const float l1 = 0.36f;
-const float l2 = 0.35f;
+const float l1 = 0.35f;
+const float l2 = 0.33f;
 float initial_height = l1 + l2 - 0.2f;
 
 
@@ -1282,67 +1282,6 @@ void signalMotors(float rAngle1, float rAngle2, float rAngle3, float rAngle4, fl
 
 
 
-//void signalMotors(float rAngle1, float rAngle2, float rAngle3, float rAngle4, float rAngle5, float rAngle6, float rAngle7, float rAngle8){
-//
-//
-//	if (motorActivated1) {
-//		CAN1_Tx_send_to_motor(motorID1, rAngle1, 0, Kp_H, Kd_H, 0);
-//	} else {
-//		CAN1_Tx_send_to_motor(motorID1, 0, 0, 0, 0, 0);
-//	}
-//
-//
-//	if (motorActivated2) {
-//		CAN1_Tx_send_to_motor(motorID2, -rAngle2, 0, Kp_K, Kd_K, 0);
-//	} else {
-//		CAN1_Tx_send_to_motor(motorID2, 0, 0, 0, 0, 0);
-//	}
-//
-//
-//	if (motorActivated3) {
-//		CAN1_Tx_send_to_motor(motorID3, rAngle3, 0, Kp_H, Kd_H, 0);
-//	} else {
-//		CAN1_Tx_send_to_motor(motorID3, 0, 0, 0, 0, 0);
-//	}
-//
-//
-//	if (motorActivated4) {
-//		CAN1_Tx_send_to_motor(motorID4, -rAngle4, 0, Kp_K, Kd_K, 0);
-//	} else {
-//		CAN1_Tx_send_to_motor(motorID4, 0, 0, 0, 0, 0);
-//	}
-//
-//
-//	if (motorActivated5) {
-//		CAN1_Tx_send_to_motor(motorID5, rAngle5, 0, Kp_H, Kd_H, 0);
-//	} else {
-//		CAN1_Tx_send_to_motor(motorID5, 0, 0, 0, 0, 0);
-//	}
-//
-//	if (motorActivated6) {
-//		CAN1_Tx_send_to_motor(motorID6, -rAngle6, 0, Kp_K, Kd_K, 0);
-//	} else {
-//		CAN1_Tx_send_to_motor(motorID6, 0, 0, 0, 0, 0);
-//	}
-//
-//
-//	if (motorActivated7) {
-//		CAN1_Tx_send_to_motor(motorID7, rAngle7, 0, Kp_H, Kd_H, 0);
-//	} else {
-//		CAN1_Tx_send_to_motor(motorID7, 0, 0, 0, 0, 0);
-//	}
-//
-//	if (motorActivated8) {
-//		CAN1_Tx_send_to_motor(motorID8, -rAngle8, 0, Kp_K, Kd_K, 0);
-//	} else {
-//		CAN1_Tx_send_to_motor(motorID8, 0, 0, 0, 0, 0);
-//	}
-//
-//}
-
-
-
-
 
 float AngleH1 = 0.0f;
 float AngleK1 = 0.0f;
@@ -1429,7 +1368,7 @@ typedef struct {
 } LegPosition;
 
 // Function to compute the x and y coordinates for a single leg
-LegPosition leg_xy(float t, float T, float beta, float L, float H, float phaseFrac, float pid_offset_y) {
+LegPosition leg_xy(float t, float T, float beta, float L, float H, float phaseFrac) {
     LegPosition pos;
 
     float offset = phaseFrac * T;
@@ -1445,7 +1384,7 @@ LegPosition leg_xy(float t, float T, float beta, float L, float H, float phaseFr
         // Stance phase: The foot is on the ground.
         pos.x = L / 2.0f - v * local_t;
         // Apply the active PID stabilization offset here
-        pos.y = -initial_height + pid_offset_y;
+        pos.y = -initial_height;
     } else {
         // Swing phase: The foot is in the air.
         float tau = (local_t - beta * T) / ((1.0f - beta) * T);
@@ -1460,6 +1399,7 @@ LegPosition leg_xy(float t, float T, float beta, float L, float H, float phaseFr
     }
     return pos;
 }
+
 
 
 
@@ -1517,6 +1457,8 @@ LegPositions getLegPositions(float t) {
 
 	// Calculate PID continuously if we are in a gait that uses it
 	if (gait == 5) {
+
+
 		float dt = t - last_pid_time;
 		if (dt <= 0.0) dt = 0.001;
 		last_pid_time = t;

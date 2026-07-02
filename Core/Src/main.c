@@ -185,7 +185,7 @@ float target_yaw = 0.0f;     // The heading we want to maintain
 
 
 float alpha_yaw = 0.005f;     // Tuning parameter: start at 0.05. Lower is smoother.
-float Kp_yaw = 0.01f;       // Proportional gain (keep this low so it corrects gently)
+volatile float Kp_yaw = 0.005f;       // Proportional gain (keep this low so it corrects gently)
 float delta_L_cm = 0.0f;
 
 
@@ -204,22 +204,6 @@ float prev_rA5=0, prev_rA6=0, prev_rA7=0, prev_rA8=0;
 
 volatile float m_t1 = 0, m_t2 = 0, m_t3 = 0, m_t4 = 0, m_t5 = 0, m_t6 = 0, m_t7 = 0, m_t8 = 0;
 volatile float v1 = 0, v2 = 0, v3 = 0, v4 = 0, v5 = 0, v6 = 0, v7 = 0, v8 = 0;
-
-
-// --- NEW CPG VARIABLES ---
-float cpg_x[4] = {0};
-float cpg_y[4] = {0};
-float dPhi[4][4] = {0};
-bool cpg_initialized = false;
-
-// CPG Tuning Parameters (From MATLAB)
-const float CPG_ALPHA = 10.0f;
-const float CPG_MU = 1.0f;
-const float CPG_K_COUPLE = 1.0f;
-const float CPG_K_OMEGA = 2.0f;
-const float CPG_K_SP = 3.0f; // Softplus sharpness
-
-
 
 
 
@@ -417,11 +401,11 @@ float H = 0.15f;
 
 
 
-float Kp_H=6.0f;
-float Kd_H=0.8f;
+float Kp_H=4.0f;
+float Kd_H=0.4f;
 
-float Kp_K=6.0f;
-float Kd_K=0.8f;
+float Kp_K=4.0f;
+float Kd_K=0.4f;
 
 
 // Gait selection
@@ -548,27 +532,6 @@ static void printEvent(void * cookie, sh2_SensorEvent_t * event) {
 }
 
 
-void init_CPG() {
-    // Phases for Walk Gait: LF, RF, LH, RH
-    float phases[4] = {0.00f, 0.50f * 2.0f * M_PI, 0.75f * 2.0f * M_PI, 0.25f * 2.0f * M_PI};
-
-    for (int i = 0; i < 4; i++) {
-        cpg_x[i] = cosf(phases[i]);
-        cpg_y[i] = sinf(phases[i]);
-
-        for (int j = 0; j < 4; j++) {
-            dPhi[i][j] = phases[i] - phases[j];
-        }
-    }
-    cpg_initialized = true;
-}
-
-
-
-
-
-
-
 /* USER CODE END 0 */
 
 /**
@@ -626,7 +589,7 @@ int main(void)
 
 	}
 
-	init_CPG();
+
 
 
 	// Start timer
@@ -1411,65 +1374,46 @@ LegPosition leg_xy(float t, float T, float beta, float L, float H, float phaseFr
     float offset = phaseFrac * T;
     float local_t = fmodf(t - offset, T);
 
+    // Handle negative wrap-around for fmodf in C
     if (local_t < 0.0f) {
         local_t += T;
     }
 
-    float v = L / (beta * T);
-
     if (local_t < beta * T) {
-        // Stance phase: The foot is on the ground.
-        pos.x = L / 2.0f - v * local_t;
-        // Apply the active PID stabilization offset here
-        pos.y = -initial_height;
+        // ==========================================
+        // STANCE PHASE: The foot is on the ground.
+        // ==========================================
+        float tau = local_t / (beta * T);
+
+        // Fast Quintic calculation: 10*tau^3 - 15*tau^4 + 6*tau^5
+        float tau2 = tau * tau;
+        float tau3 = tau2 * tau;
+        float s = tau3 * (10.0f - 15.0f * tau + 6.0f * tau2);
+
+        pos.x = (L / 2.0f) - (L * s);
+        pos.y = -initial_height; // Apply active PID offset here if needed
+
     } else {
-        // Swing phase: The foot is in the air.
+        // ==========================================
+        // SWING PHASE: The foot is in the air.
+        // ==========================================
         float tau = (local_t - beta * T) / ((1.0f - beta) * T);
-        float tau_sq = tau * tau;
-        float tau_cub = tau_sq * tau;
 
-        pos.x = -L / 2.0f - v * tau + 3.0f * (L + v) * tau_sq - 2.0f * (L + v) * tau_cub;
+        // Fast Quintic calculation
+        float tau2 = tau * tau;
+        float tau3 = tau2 * tau;
+        float s = tau3 * (10.0f - 15.0f * tau + 6.0f * tau2);
 
-        float s = sinf(M_PI * tau);
-        // Do NOT apply PID offsets here. Let the foot clear the ground naturally.
-        pos.y = -initial_height + H * (s * s);
+        pos.x = -(L / 2.0f) + (L * s);
+
+        // Smooth bell-curve lift synced to the quintic X motion
+        // Do NOT apply PID offsets here to ensure ground clearance.
+        pos.y = -initial_height + H * sinf(M_PI * s);
     }
+
     return pos;
 }
 
-void step_CPG(float dt) {
-    if (!cpg_initialized) return;
-
-    float w_stance = M_PI / (beta * T);
-    float w_swing  = M_PI / ((1.0f - beta) * T);
-
-    float dx[4] = {0};
-    float dy[4] = {0};
-
-    // 1. Calculate derivatives
-    for (int i = 0; i < 4; i++) {
-        float blend = 1.0f / (1.0f + expf(-CPG_K_OMEGA * cpg_y[i]));
-        float w = w_stance * (1.0f - blend) + w_swing * blend;
-
-        float r_sq = cpg_x[i]*cpg_x[i] + cpg_y[i]*cpg_y[i];
-        dx[i] = CPG_ALPHA * (CPG_MU - r_sq) * cpg_x[i] - w * cpg_y[i];
-        dy[i] = CPG_ALPHA * (CPG_MU - r_sq) * cpg_y[i] + w * cpg_x[i];
-
-        // 2. Add Coupling
-        for (int j = 0; j < 4; j++) {
-            if (i != j) {
-                dx[i] += CPG_K_COUPLE * (cosf(dPhi[i][j])*cpg_x[j] - sinf(dPhi[i][j])*cpg_y[j]);
-                dy[i] += CPG_K_COUPLE * (sinf(dPhi[i][j])*cpg_x[j] + cosf(dPhi[i][j])*cpg_y[j]);
-            }
-        }
-    }
-
-    // 3. Euler Integration Step
-    for (int i = 0; i < 4; i++) {
-        cpg_x[i] += dx[i] * dt;
-        cpg_y[i] += dy[i] * dt;
-    }
-}
 
 
 
@@ -1482,7 +1426,7 @@ typedef struct {
 } LegPositions;
 
 // Main function to get all four leg positions
-LegPositions getLegPositions(float t, float dt) {
+LegPositions getLegPositions(float t) {
     LegPositions all_pos;
 
 
@@ -1586,108 +1530,80 @@ LegPositions getLegPositions(float t, float dt) {
 
 
 
-//	// FORWARD WALK WITH YAW CORRETION
-//		if (gait == 6) { // Walk
-//
-//			// Saturate for safety
-//			float max_delta_L = 0.2f;   // Max allowable stride change (in meters)
-//			delta_L = saturate(delta_L, -max_delta_L, max_delta_L);
-//
-//			// Calculate independent left and right stride lengths
-//			float L_left = L - delta_L;
-//			float L_right = L + delta_L;
-//
-//			// Feed the modified stride lengths to the respective legs
-//			all_pos.lf = leg_xy(t, T, beta, L_left, H, ph_LF, 0.0f);
-//			all_pos.lh = leg_xy(t, T, beta, L_left, H, ph_LH, 0.0f);
-//
-//			all_pos.rf = leg_xy(t, T, beta, L_right, H, ph_RF, 0.0f);
-//			all_pos.rh = leg_xy(t, T, beta, L_right, H, ph_RH, 0.0f);
-//		}
-//
-//
-//		// BACKWARD WALK WITH YAW CORRECTION
-//		if (gait == -6) { // Walk backward with yaw correction
-//
-//			// Saturate for safety
-//			float max_delta_L = 0.2f;   // Max allowable stride change (in meters)
-//			delta_L = saturate(delta_L, -max_delta_L, max_delta_L);
-//
-//			// Calculate independent left and right stride lengths
-//			// NOTE: delta_L application is inverted (+ for left, - for right)
-//			// compared to forward walking. Steering backward requires the opposite
-//			// stride bias to correct the nose heading in the same direction.
-//			float L_left = L + delta_L;
-//			float L_right = L - delta_L;
-//
-//			// Feed the modified stride lengths and reversed phases (from gait -1)
-//			all_pos.lf = leg_xy(t, T, beta, L_left, H, ph_LH, 0.0f);
-//			all_pos.rh = leg_xy(t, T, beta, L_right, H, ph_RF, 0.0f);
-//			all_pos.rf = leg_xy(t, T, beta, L_right, H, ph_RH, 0.0f);
-//			all_pos.lh = leg_xy(t, T, beta, L_left, H, ph_LF, 0.0f);
-//
-//			// Invert the x-axis to physically move backward (from gait -1)
-//			all_pos.lf.x = -all_pos.lf.x;
-//			all_pos.rh.x = -all_pos.rh.x;
-//			all_pos.rf.x = -all_pos.rf.x;
-//			all_pos.lh.x = -all_pos.lh.x;
-//		}
+	// FORWARD WALK WITH YAW CORRETION
+		if (gait == 6) { // Walk
 
-		// --- HOPF CPG GAIT ---
-		if (gait == 7) {
-			// Advance the oscillator states
-			step_CPG(dt);
+			// Saturate for safety
+			float max_delta_L = 0.05f;   // Max allowable stride change (in meters)
+			delta_L = saturate(delta_L, -max_delta_L, max_delta_L);
 
-			// Map CPG Output to Leg Positions (LF=0, RF=1, LH=2, RH=3)
-			// LF
-			all_pos.lf.x = cpg_x[0] * (L / 2.0f);
-			float smooth_y_lf = logf(1.0f + expf(CPG_K_SP * cpg_y[0])) / CPG_K_SP;
-			all_pos.lf.y = -initial_height + (smooth_y_lf * H);
+			// Calculate independent left and right stride lengths
+			float L_left = L - delta_L;
+			float L_right = L + delta_L;
 
-			// RF
-			all_pos.rf.x = cpg_x[1] * (L / 2.0f);
-			float smooth_y_rf = logf(1.0f + expf(CPG_K_SP * cpg_y[1])) / CPG_K_SP;
-			all_pos.rf.y = -initial_height + (smooth_y_rf * H);
+			// Feed the modified stride lengths to the respective legs
+			all_pos.lf = leg_xy(t, T, beta, L_left, H, ph_LF);
+			all_pos.lh = leg_xy(t, T, beta, L_left, H, ph_LH);
 
-			// LH
-			all_pos.lh.x = cpg_x[2] * (L / 2.0f);
-			float smooth_y_lh = logf(1.0f + expf(CPG_K_SP * cpg_y[2])) / CPG_K_SP;
-			all_pos.lh.y = -initial_height + (smooth_y_lh * H);
-
-			// RH
-			all_pos.rh.x = cpg_x[3] * (L / 2.0f);
-			float smooth_y_rh = logf(1.0f + expf(CPG_K_SP * cpg_y[3])) / CPG_K_SP;
-			all_pos.rh.y = -initial_height + (smooth_y_rh * H);
-
-			return all_pos;
+			all_pos.rf = leg_xy(t, T, beta, L_right, H, ph_RF);
+			all_pos.rh = leg_xy(t, T, beta, L_right, H, ph_RH);
 		}
 
 
-//	// 2. Calculate Raw Leg Positions (Local Trajectories)
-//	if (gait == 1) { // Walk
-//		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF, 0.0f);
-//		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RH, 0.0f);
-//		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF, 0.0f);
-//		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH, 0.0f);
-//	}
-//	if (gait == -1) { // Walk backward
-//		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LH, 0.0f);
-//		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RF, 0.0f);
-//		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RH, 0.0f);
-//		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LF, 0.0f);
-//
-//
-//		all_pos.lf.x = -all_pos.lf.x;
-//		all_pos.rh.x = -all_pos.rh.x;
-//		all_pos.rf.x = -all_pos.rf.x;
-//		all_pos.lh.x = -all_pos.lh.x;
-//	}
-//	if (gait == 2) { // Trot
-//		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF, 0.0f);
-//		all_pos.rh = leg_xy(t, T, beta, L, H, ph_LF, 0.0f);
-//		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF, 0.0f);
-//		all_pos.lh = leg_xy(t, T, beta, L, H, ph_RF, 0.0f);
-//	}
+		// BACKWARD WALK WITH YAW CORRECTION
+		if (gait == -6) { // Walk backward with yaw correction
+
+			// Saturate for safety
+			float max_delta_L = 0.2f;   // Max allowable stride change (in meters)
+			delta_L = saturate(delta_L, -max_delta_L, max_delta_L);
+
+			// Calculate independent left and right stride lengths
+			// NOTE: delta_L application is inverted (+ for left, - for right)
+			// compared to forward walking. Steering backward requires the opposite
+			// stride bias to correct the nose heading in the same direction.
+			float L_left = L + delta_L;
+			float L_right = L - delta_L;
+
+			// Feed the modified stride lengths and reversed phases (from gait -1)
+			all_pos.lf = leg_xy(t, T, beta, L_left, H, ph_LH);
+			all_pos.rh = leg_xy(t, T, beta, L_right, H, ph_RF);
+			all_pos.rf = leg_xy(t, T, beta, L_right, H, ph_RH);
+			all_pos.lh = leg_xy(t, T, beta, L_left, H, ph_LF);
+
+			// Invert the x-axis to physically move backward (from gait -1)
+			all_pos.lf.x = -all_pos.lf.x;
+			all_pos.rh.x = -all_pos.rh.x;
+			all_pos.rf.x = -all_pos.rf.x;
+			all_pos.lh.x = -all_pos.lh.x;
+		}
+
+
+
+	// 2. Calculate Raw Leg Positions (Local Trajectories)
+	if (gait == 1) { // Walk
+		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
+		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RH);
+		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
+		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH);
+	}
+	if (gait == -1) { // Walk backward
+		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LH);
+		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RF);
+		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RH);
+		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LF);
+
+
+		all_pos.lf.x = -all_pos.lf.x;
+		all_pos.rh.x = -all_pos.rh.x;
+		all_pos.rf.x = -all_pos.rf.x;
+		all_pos.lh.x = -all_pos.lh.x;
+	}
+	if (gait == 2) { // Trot
+		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
+		all_pos.rh = leg_xy(t, T, beta, L, H, ph_LF);
+		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
+		all_pos.lh = leg_xy(t, T, beta, L, H, ph_RF);
+	}
 	if (gait == 3) { //  Heavy Lift Squat Test
 
 		// --- SATURATION LOGIC ---
@@ -1788,18 +1704,7 @@ void updateControlParameters() {
 
 
 
-
-
-	// --- 1. CALCULATE TIME STEP (dt) ---
-	float current_time = seconds_elapsed;
-	float dt = current_time - last_ff_time;
-	if (dt <= 0.0001f) dt = 0.001f; // Prevent division by zero
-	last_ff_time = current_time;
-
-
-
-
-	LegPositions xyCoords = getLegPositions(seconds_elapsed, dt);
+	LegPositions xyCoords = getLegPositions(seconds_elapsed);
 
 
 
@@ -1846,7 +1751,11 @@ void updateControlParameters() {
 
 
 
-
+	// --- 1. CALCULATE TIME STEP (dt) ---
+	float current_time = seconds_elapsed;
+	float dt = current_time - last_ff_time;
+	if (dt <= 0.0001f) dt = 0.001f; // Prevent division by zero
+	last_ff_time = current_time;
 
 
 	// --- 2. VELOCITY FEEDFORWARD (Numerical Derivative) ---

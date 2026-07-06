@@ -152,6 +152,11 @@ volatile float roll_deg = 0.0f;
 volatile float pitch_deg = 0.0f;
 volatile float yaw_deg = 0.0f;
 
+// --- Posture PID Filtering Variables ---
+float alpha_pid_d = 0.15f; // Smoothing factor for D-term (0.0 to 1.0, lower = smoother)
+float pitch_deriv_filtered = 0.0f;
+float roll_deriv_filtered = 0.0f;
+float pid_deadband = 1.0f; // Degrees of tolerance before reacting
 
 // --- Posture PID Control Variables ---
 float Kd_bal_pitch = 0.0005f; // Derivative: Damps the motion
@@ -159,9 +164,13 @@ float Ki_bal_pitch = 0.001f; // Integral: Removes steady-state offset (start at 
 float Kp_bal_pitch = 0.01f; // Proportional: Drives error to zero
 
 
-float Kd_bal_roll = 0.0008f; // Derivative: Damps the motion
-float Ki_bal_roll = 0.001f; // Integral: Removes steady-state offset (start at 0)
-float Kp_bal_roll = 0.007f; // Proportional: Drives error to zero
+//float Kd_bal_roll = 0.0008f; // Derivative: Damps the motion
+//float Ki_bal_roll = 0.001f; // Integral: Removes steady-state offset (start at 0)
+//float Kp_bal_roll = 0.007f; // Proportional: Drives error to zero
+
+float Kd_bal_roll = 0.0f; // Derivative: Damps the motion
+float Ki_bal_roll = 0.0f; // Integral: Removes steady-state offset (start at 0)
+float Kp_bal_roll = 0.0f; // Proportional: Drives error to zero
 
 
 
@@ -1467,10 +1476,8 @@ LegPositions getLegPositions(float t) {
 	// 2. --- CALCULATE ACTIVE POSTURE PID OFFSETS ---
 	float delta_y_pitch = 0.0f;
 	float delta_y_roll = 0.0f;
-
 	// Calculate PID continuously if we are in a gait that uses it
 	if (gait == 5) {
-
 
 		float dt = t - last_pid_time;
 		if (dt <= 0.0) dt = 0.001;
@@ -1479,11 +1486,26 @@ LegPositions getLegPositions(float t) {
 		float pitch_error = pitch_deg;
 		float roll_error  = roll_deg;
 
+		// 1. DEADBAND: Ignore tiny noise to stop micro-chattering
+		if (fabs(pitch_error) < pid_deadband) pitch_error = 0.0f;
+		if (fabs(roll_error) < pid_deadband) roll_error = 0.0f;
+
 		float P_pitch = Kp_bal_pitch * pitch_error;
 		float P_roll  = Kp_bal_roll * roll_error;
 
-		pitch_integral += pitch_error * dt;
-		roll_integral  += roll_error * dt;
+		// 2. INTEGRAL WINDUP & DECAY
+		// Only integrate if we are actively correcting outside the deadband
+		if (pitch_error != 0.0f) {
+			pitch_integral += pitch_error * dt;
+		} else {
+			pitch_integral *= 0.9f; // Decay to 0 when stable to prevent lingering offsets
+		}
+
+		if (roll_error != 0.0f) {
+			roll_integral += roll_error * dt;
+		} else {
+			roll_integral *= 0.9f;
+		}
 
 		pitch_integral = saturate(pitch_integral, -50.0, 50.0);
 		roll_integral  = saturate(roll_integral, -50.0, 50.0);
@@ -1491,14 +1513,16 @@ LegPositions getLegPositions(float t) {
 		float I_pitch = Ki_bal_pitch * pitch_integral;
 		float I_roll  = Ki_bal_roll * roll_integral;
 
-		float pitch_deriv = (pitch_error - pitch_prev_error) / dt;
-		float roll_deriv  = (roll_error - roll_prev_error) / dt;
+		// 3. LOW-PASS FILTER ON DERIVATIVE (Mitigates "Derivative Kick")
+		float raw_pitch_deriv = (pitch_error - pitch_prev_error) / dt;
+		float raw_roll_deriv  = (roll_error - roll_prev_error) / dt;
 
-		float D_pitch = Kd_bal_pitch * (pitch_deriv);
-		float D_roll  = Kd_bal_roll * (roll_deriv);
+		pitch_deriv_filtered = (alpha_pid_d * raw_pitch_deriv) + ((1.0f - alpha_pid_d) * pitch_deriv_filtered);
+		roll_deriv_filtered  = (alpha_pid_d * raw_roll_deriv) + ((1.0f - alpha_pid_d) * roll_deriv_filtered);
 
-		//		D_pitch = Kd_bal_pitch * (-gyro_pitch_rate);
-		//		D_roll  = Kd_bal_roll * (-gyro_roll_rate);
+		float D_pitch = Kd_bal_pitch * pitch_deriv_filtered;
+		float D_roll  = Kd_bal_roll * roll_deriv_filtered;
+
 		pitch_prev_error = pitch_error;
 		roll_prev_error  = roll_error;
 
@@ -1507,7 +1531,6 @@ LegPositions getLegPositions(float t) {
 
 		delta_y_pitch = saturate(delta_y_pitch, -MAX_COMPENSATION, MAX_COMPENSATION);
 		delta_y_roll  = saturate(delta_y_roll, -MAX_COMPENSATION, MAX_COMPENSATION);
-
 
 		// Apply Offsets to Legs (Y is negative going down)
 		// Front Left (LF)
@@ -1525,8 +1548,7 @@ LegPositions getLegPositions(float t) {
 		// Right Hind (RH)
 		all_pos.rh.x = 0.0;
 		all_pos.rh.y = -initial_height - delta_y_pitch + delta_y_roll;
-		}
-
+	}
 
 
 

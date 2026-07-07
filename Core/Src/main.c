@@ -152,11 +152,6 @@ volatile float roll_deg = 0.0f;
 volatile float pitch_deg = 0.0f;
 volatile float yaw_deg = 0.0f;
 
-// --- Posture PID Filtering Variables ---
-float alpha_pid_d = 0.15f; // Smoothing factor for D-term (0.0 to 1.0, lower = smoother)
-float pitch_deriv_filtered = 0.0f;
-float roll_deriv_filtered = 0.0f;
-float pid_deadband = 1.0f; // Degrees of tolerance before reacting
 
 // --- Posture PID Control Variables ---
 float Kd_bal_pitch = 0.0005f; // Derivative: Damps the motion
@@ -164,13 +159,9 @@ float Ki_bal_pitch = 0.001f; // Integral: Removes steady-state offset (start at 
 float Kp_bal_pitch = 0.01f; // Proportional: Drives error to zero
 
 
-//float Kd_bal_roll = 0.0008f; // Derivative: Damps the motion
-//float Ki_bal_roll = 0.001f; // Integral: Removes steady-state offset (start at 0)
-//float Kp_bal_roll = 0.007f; // Proportional: Drives error to zero
-
-float Kd_bal_roll = 0.0f; // Derivative: Damps the motion
-float Ki_bal_roll = 0.0f; // Integral: Removes steady-state offset (start at 0)
-float Kp_bal_roll = 0.0f; // Proportional: Drives error to zero
+float Kd_bal_roll = 0.0008f; // Derivative: Damps the motion
+float Ki_bal_roll = 0.001f; // Integral: Removes steady-state offset (start at 0)
+float Kp_bal_roll = 0.007f; // Proportional: Drives error to zero
 
 
 
@@ -194,7 +185,7 @@ float target_yaw = 0.0f;     // The heading we want to maintain
 
 
 float alpha_yaw = 0.005f;     // Tuning parameter: start at 0.05. Lower is smoother.
-volatile float Kp_yaw = 0.005f;       // Proportional gain (keep this low so it corrects gently)
+float Kp_yaw = 0.01f;       // Proportional gain (keep this low so it corrects gently)
 float delta_L_cm = 0.0f;
 
 
@@ -202,7 +193,7 @@ float delta_L_cm = 0.0f;
 // 60 lbs (robot) + 20 lbs (payload) = 80 lbs total.
 // 80 lbs = 36.3 kg. Total Force = 36.3 * 9.81 = 356 Newtons.
 // Force per leg = 356 / 4 = 89 Newtons.
-volatile float added_weight = 20.0f;
+volatile float added_weight = -60.0f;
 
 float last_ff_time = 0.0f;
 
@@ -391,8 +382,8 @@ float ttime2 = 0.0f;
 
 
 // Global constants for link lengths
-const float l1 = 0.35f;
-const float l2 = 0.33f;
+const float l1 = 0.36f;
+const float l2 = 0.35f;
 float initial_height = l1 + l2 - 0.2f;
 
 
@@ -410,11 +401,11 @@ float H = 0.15f;
 
 
 
-float Kp_H=4.0f;
-float Kd_H=0.4f;
+float Kp_H=6.0f;
+float Kd_H=0.8f;
 
-float Kp_K=4.0f;
-float Kd_K=0.4f;
+float Kp_K=6.0f;
+float Kd_K=0.8f;
 
 
 // Gait selection
@@ -1291,6 +1282,67 @@ void signalMotors(float rAngle1, float rAngle2, float rAngle3, float rAngle4, fl
 
 
 
+//void signalMotors(float rAngle1, float rAngle2, float rAngle3, float rAngle4, float rAngle5, float rAngle6, float rAngle7, float rAngle8){
+//
+//
+//	if (motorActivated1) {
+//		CAN1_Tx_send_to_motor(motorID1, rAngle1, 0, Kp_H, Kd_H, 0);
+//	} else {
+//		CAN1_Tx_send_to_motor(motorID1, 0, 0, 0, 0, 0);
+//	}
+//
+//
+//	if (motorActivated2) {
+//		CAN1_Tx_send_to_motor(motorID2, -rAngle2, 0, Kp_K, Kd_K, 0);
+//	} else {
+//		CAN1_Tx_send_to_motor(motorID2, 0, 0, 0, 0, 0);
+//	}
+//
+//
+//	if (motorActivated3) {
+//		CAN1_Tx_send_to_motor(motorID3, rAngle3, 0, Kp_H, Kd_H, 0);
+//	} else {
+//		CAN1_Tx_send_to_motor(motorID3, 0, 0, 0, 0, 0);
+//	}
+//
+//
+//	if (motorActivated4) {
+//		CAN1_Tx_send_to_motor(motorID4, -rAngle4, 0, Kp_K, Kd_K, 0);
+//	} else {
+//		CAN1_Tx_send_to_motor(motorID4, 0, 0, 0, 0, 0);
+//	}
+//
+//
+//	if (motorActivated5) {
+//		CAN1_Tx_send_to_motor(motorID5, rAngle5, 0, Kp_H, Kd_H, 0);
+//	} else {
+//		CAN1_Tx_send_to_motor(motorID5, 0, 0, 0, 0, 0);
+//	}
+//
+//	if (motorActivated6) {
+//		CAN1_Tx_send_to_motor(motorID6, -rAngle6, 0, Kp_K, Kd_K, 0);
+//	} else {
+//		CAN1_Tx_send_to_motor(motorID6, 0, 0, 0, 0, 0);
+//	}
+//
+//
+//	if (motorActivated7) {
+//		CAN1_Tx_send_to_motor(motorID7, rAngle7, 0, Kp_H, Kd_H, 0);
+//	} else {
+//		CAN1_Tx_send_to_motor(motorID7, 0, 0, 0, 0, 0);
+//	}
+//
+//	if (motorActivated8) {
+//		CAN1_Tx_send_to_motor(motorID8, -rAngle8, 0, Kp_K, Kd_K, 0);
+//	} else {
+//		CAN1_Tx_send_to_motor(motorID8, 0, 0, 0, 0, 0);
+//	}
+//
+//}
+
+
+
+
 
 float AngleH1 = 0.0f;
 float AngleK1 = 0.0f;
@@ -1327,8 +1379,8 @@ typedef struct {
 // IK function (Now only calculates the requested configuration)
 IKResult IK(float x, float y, float theta2_min, float theta2_max, bool use_up_solution)
 {
-    const float theta1_min = -60.0f * M_PI/180.0f;
-    const float theta1_max =  60.0f * M_PI/180.0f;
+    const float theta1_min = -70.0f * M_PI/180.0f;
+    const float theta1_max =  70.0f * M_PI/180.0f;
     theta2_min = theta2_min * M_PI/180.0f;
     theta2_max = theta2_max * M_PI/180.0f;
 
@@ -1377,49 +1429,54 @@ typedef struct {
 } LegPosition;
 
 // Function to compute the x and y coordinates for a single leg
-LegPosition leg_xy(float t, float T, float beta, float L, float H, float phaseFrac) {
+LegPosition leg_xy(float t, float T, float beta, float L, float H, float phaseFrac, float pid_offset_y) {
     LegPosition pos;
 
     float offset = phaseFrac * T;
     float local_t = fmodf(t - offset, T);
 
-    // Handle negative wrap-around for fmodf in C
     if (local_t < 0.0f) {
         local_t += T;
     }
 
+
+
     if (local_t < beta * T) {
-        // ==========================================
-        // STANCE PHASE: The foot is on the ground.
-        // ==========================================
-        float tau = local_t / (beta * T);
+            float v = L / (beta * T);
+            // Stance phase: The foot is on the ground.
+            pos.x = L / 2.0f - v * local_t;
+            // Apply the active PID stabilization offset here
+            pos.y = -initial_height + pid_offset_y;
+        } else {
+            // Swing phase: The foot is in the air.
+            float tau = (local_t - beta * T) / ((1.0f - beta) * T);
 
-        // Fast Quintic calculation: 10*tau^3 - 15*tau^4 + 6*tau^5
-        float tau2 = tau * tau;
-        float tau3 = tau2 * tau;
-        float s = tau3 * (10.0f - 15.0f * tau + 6.0f * tau2);
+            // Stance velocity scaled to the swing phase's normalized time
+            float V = -L * (1.0f - beta) / beta;
 
-        pos.x = (L / 2.0f) - (L * s);
-        pos.y = -initial_height; // Apply active PID offset here if needed
+            // Calculate powers of tau efficiently
+            float tau2 = tau * tau;
+            float tau3 = tau2 * tau;
+            float tau4 = tau3 * tau;
+            float tau5 = tau4 * tau;
+            float tau6 = tau5 * tau;
+            float tau7 = tau6 * tau;
 
-    } else {
-        // ==========================================
-        // SWING PHASE: The foot is in the air.
-        // ==========================================
-        float tau = (local_t - beta * T) / ((1.0f - beta) * T);
+            // 1. X-AXIS: 7th-Order (Septic) Transition
+            // Guarantees C3 (Jerk) continuity at tau = 0 and tau = 1
+            float s = -20.0f * tau7 + 70.0f * tau6 - 84.0f * tau5 + 35.0f * tau4;
+            pos.x = -(L / 2.0f) + V * tau + (L - V) * s;
 
-        // Fast Quintic calculation
-        float tau2 = tau * tau;
-        float tau3 = tau2 * tau;
-        float s = tau3 * (10.0f - 15.0f * tau + 6.0f * tau2);
+            // 2. Y-AXIS: 8th-Order Symmetric Polynomial
+            // Replaces the stacked sine wave. Max value is exactly H at tau = 0.5.
+            // Efficient calculation of (1 - tau)^4 without using powf()
+            float one_minus_tau = 1.0f - tau;
+            float one_minus_tau2 = one_minus_tau * one_minus_tau;
+            float one_minus_tau4 = one_minus_tau2 * one_minus_tau2;
 
-        pos.x = -(L / 2.0f) + (L * s);
-
-        // Smooth bell-curve lift synced to the quintic X motion
-        // Do NOT apply PID offsets here to ensure ground clearance.
-        pos.y = -initial_height + H * sinf(M_PI * s);
-    }
-
+            // Do NOT apply PID offsets here. Let the foot clear the ground naturally.
+            pos.y = -initial_height + 256.0f * H * (tau4 * one_minus_tau4);
+        }
     return pos;
 }
 
@@ -1476,9 +1533,9 @@ LegPositions getLegPositions(float t) {
 	// 2. --- CALCULATE ACTIVE POSTURE PID OFFSETS ---
 	float delta_y_pitch = 0.0f;
 	float delta_y_roll = 0.0f;
+
 	// Calculate PID continuously if we are in a gait that uses it
 	if (gait == 5) {
-
 		float dt = t - last_pid_time;
 		if (dt <= 0.0) dt = 0.001;
 		last_pid_time = t;
@@ -1486,26 +1543,11 @@ LegPositions getLegPositions(float t) {
 		float pitch_error = pitch_deg;
 		float roll_error  = roll_deg;
 
-		// 1. DEADBAND: Ignore tiny noise to stop micro-chattering
-		if (fabs(pitch_error) < pid_deadband) pitch_error = 0.0f;
-		if (fabs(roll_error) < pid_deadband) roll_error = 0.0f;
-
 		float P_pitch = Kp_bal_pitch * pitch_error;
 		float P_roll  = Kp_bal_roll * roll_error;
 
-		// 2. INTEGRAL WINDUP & DECAY
-		// Only integrate if we are actively correcting outside the deadband
-		if (pitch_error != 0.0f) {
-			pitch_integral += pitch_error * dt;
-		} else {
-			pitch_integral *= 0.9f; // Decay to 0 when stable to prevent lingering offsets
-		}
-
-		if (roll_error != 0.0f) {
-			roll_integral += roll_error * dt;
-		} else {
-			roll_integral *= 0.9f;
-		}
+		pitch_integral += pitch_error * dt;
+		roll_integral  += roll_error * dt;
 
 		pitch_integral = saturate(pitch_integral, -50.0, 50.0);
 		roll_integral  = saturate(roll_integral, -50.0, 50.0);
@@ -1513,16 +1555,14 @@ LegPositions getLegPositions(float t) {
 		float I_pitch = Ki_bal_pitch * pitch_integral;
 		float I_roll  = Ki_bal_roll * roll_integral;
 
-		// 3. LOW-PASS FILTER ON DERIVATIVE (Mitigates "Derivative Kick")
-		float raw_pitch_deriv = (pitch_error - pitch_prev_error) / dt;
-		float raw_roll_deriv  = (roll_error - roll_prev_error) / dt;
+		float pitch_deriv = (pitch_error - pitch_prev_error) / dt;
+		float roll_deriv  = (roll_error - roll_prev_error) / dt;
 
-		pitch_deriv_filtered = (alpha_pid_d * raw_pitch_deriv) + ((1.0f - alpha_pid_d) * pitch_deriv_filtered);
-		roll_deriv_filtered  = (alpha_pid_d * raw_roll_deriv) + ((1.0f - alpha_pid_d) * roll_deriv_filtered);
+		float D_pitch = Kd_bal_pitch * (pitch_deriv);
+		float D_roll  = Kd_bal_roll * (roll_deriv);
 
-		float D_pitch = Kd_bal_pitch * pitch_deriv_filtered;
-		float D_roll  = Kd_bal_roll * roll_deriv_filtered;
-
+		//		D_pitch = Kd_bal_pitch * (-gyro_pitch_rate);
+		//		D_roll  = Kd_bal_roll * (-gyro_roll_rate);
 		pitch_prev_error = pitch_error;
 		roll_prev_error  = roll_error;
 
@@ -1531,6 +1571,7 @@ LegPositions getLegPositions(float t) {
 
 		delta_y_pitch = saturate(delta_y_pitch, -MAX_COMPENSATION, MAX_COMPENSATION);
 		delta_y_roll  = saturate(delta_y_roll, -MAX_COMPENSATION, MAX_COMPENSATION);
+
 
 		// Apply Offsets to Legs (Y is negative going down)
 		// Front Left (LF)
@@ -1548,7 +1589,8 @@ LegPositions getLegPositions(float t) {
 		// Right Hind (RH)
 		all_pos.rh.x = 0.0;
 		all_pos.rh.y = -initial_height - delta_y_pitch + delta_y_roll;
-	}
+		}
+
 
 
 
@@ -1556,7 +1598,7 @@ LegPositions getLegPositions(float t) {
 		if (gait == 6) { // Walk
 
 			// Saturate for safety
-			float max_delta_L = 0.05f;   // Max allowable stride change (in meters)
+			float max_delta_L = 0.2f;   // Max allowable stride change (in meters)
 			delta_L = saturate(delta_L, -max_delta_L, max_delta_L);
 
 			// Calculate independent left and right stride lengths
@@ -1564,11 +1606,11 @@ LegPositions getLegPositions(float t) {
 			float L_right = L + delta_L;
 
 			// Feed the modified stride lengths to the respective legs
-			all_pos.lf = leg_xy(t, T, beta, L_left, H, ph_LF);
-			all_pos.lh = leg_xy(t, T, beta, L_left, H, ph_LH);
+			all_pos.lf = leg_xy(t, T, beta, L_left, H, ph_LF, 0.0f);
+			all_pos.lh = leg_xy(t, T, beta, L_left, H, ph_LH, 0.0f);
 
-			all_pos.rf = leg_xy(t, T, beta, L_right, H, ph_RF);
-			all_pos.rh = leg_xy(t, T, beta, L_right, H, ph_RH);
+			all_pos.rf = leg_xy(t, T, beta, L_right, H, ph_RF, 0.0f);
+			all_pos.rh = leg_xy(t, T, beta, L_right, H, ph_RH, 0.0f);
 		}
 
 
@@ -1587,10 +1629,10 @@ LegPositions getLegPositions(float t) {
 			float L_right = L - delta_L;
 
 			// Feed the modified stride lengths and reversed phases (from gait -1)
-			all_pos.lf = leg_xy(t, T, beta, L_left, H, ph_LH);
-			all_pos.rh = leg_xy(t, T, beta, L_right, H, ph_RF);
-			all_pos.rf = leg_xy(t, T, beta, L_right, H, ph_RH);
-			all_pos.lh = leg_xy(t, T, beta, L_left, H, ph_LF);
+			all_pos.lf = leg_xy(t, T, beta, L_left, H, ph_LH, 0.0f);
+			all_pos.rh = leg_xy(t, T, beta, L_right, H, ph_RF, 0.0f);
+			all_pos.rf = leg_xy(t, T, beta, L_right, H, ph_RH, 0.0f);
+			all_pos.lh = leg_xy(t, T, beta, L_left, H, ph_LF, 0.0f);
 
 			// Invert the x-axis to physically move backward (from gait -1)
 			all_pos.lf.x = -all_pos.lf.x;
@@ -1603,16 +1645,16 @@ LegPositions getLegPositions(float t) {
 
 	// 2. Calculate Raw Leg Positions (Local Trajectories)
 	if (gait == 1) { // Walk
-		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
-		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RH);
-		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
-		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH);
+		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF, 0.0f);
+		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RH, 0.0f);
+		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF, 0.0f);
+		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LH, 0.0f);
 	}
 	if (gait == -1) { // Walk backward
-		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LH);
-		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RF);
-		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RH);
-		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LF);
+		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LH, 0.0f);
+		all_pos.rh = leg_xy(t, T, beta, L, H, ph_RF, 0.0f);
+		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RH, 0.0f);
+		all_pos.lh = leg_xy(t, T, beta, L, H, ph_LF, 0.0f);
 
 
 		all_pos.lf.x = -all_pos.lf.x;
@@ -1621,10 +1663,10 @@ LegPositions getLegPositions(float t) {
 		all_pos.lh.x = -all_pos.lh.x;
 	}
 	if (gait == 2) { // Trot
-		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF);
-		all_pos.rh = leg_xy(t, T, beta, L, H, ph_LF);
-		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF);
-		all_pos.lh = leg_xy(t, T, beta, L, H, ph_RF);
+		all_pos.lf = leg_xy(t, T, beta, L, H, ph_LF, 0.0f);
+		all_pos.rh = leg_xy(t, T, beta, L, H, ph_LF, 0.0f);
+		all_pos.rf = leg_xy(t, T, beta, L, H, ph_RF, 0.0f);
+		all_pos.lh = leg_xy(t, T, beta, L, H, ph_RF, 0.0f);
 	}
 	if (gait == 3) { //  Heavy Lift Squat Test
 

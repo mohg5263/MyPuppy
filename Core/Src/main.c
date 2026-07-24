@@ -394,10 +394,10 @@ volatile uint32_t imu_timer_overflows = 0;
 float seconds_elapsed = 0.0f;
 
 
-float T = 1.0f;
+float T = 0.9f;
 float beta = 0.65f;
-float L = 0.2f;
-float H = 0.15f;
+float L = 0.3f;
+float H = 0.1f;
 
 
 
@@ -1500,12 +1500,24 @@ LegPositions getLegPositions(float t) {
 //	double initial_height = l1 + l2 - 0.2;
 
 	// Phase offsets
-	float ph_LF = 0.00;
-	float ph_RH = 0.25;
-	float ph_RF = 0.50;
-	float ph_LH = 0.75;
+//	float ph_LF = 0.00;
+//	float ph_RH = 0.25;
+//	float ph_RF = 0.50;
+//	float ph_LH = 0.75;
+
+    float ph_RF = 0.75f;
+    float ph_LH = 0.0f;
+    float ph_LF = 0.25f;
+	float ph_RH = 0.50f;
 
 
+
+
+
+//	all_pos.rf = leg_xy(t, T, beta, L_right, H, ph_RF, 0.0f);
+//	all_pos.lh = leg_xy(t, T, beta, L_left, H, ph_LH, 0.0f);
+//	all_pos.lf = leg_xy(t, T, beta, L_left, H, ph_LF, 0.0f);
+//	all_pos.rh = leg_xy(t, T, beta, L_right, H, ph_RH, 0.0f);
 
 	//1. FILTER THE RAW YAW ---
 	// Update the filtered_yaw using the Exponential Moving Average formula
@@ -1606,10 +1618,9 @@ LegPositions getLegPositions(float t) {
 			float L_right = L + delta_L;
 
 			// Feed the modified stride lengths to the respective legs
-			all_pos.lf = leg_xy(t, T, beta, L_left, H, ph_LF, 0.0f);
-			all_pos.lh = leg_xy(t, T, beta, L_left, H, ph_LH, 0.0f);
-
 			all_pos.rf = leg_xy(t, T, beta, L_right, H, ph_RF, 0.0f);
+			all_pos.lh = leg_xy(t, T, beta, L_left, H, ph_LH, 0.0f);
+			all_pos.lf = leg_xy(t, T, beta, L_left, H, ph_LF, 0.0f);
 			all_pos.rh = leg_xy(t, T, beta, L_right, H, ph_RH, 0.0f);
 		}
 
